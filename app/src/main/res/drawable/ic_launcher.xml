@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- 粉底圆角方块 -->
+    <path
+        android:fillColor="#FF6FAE"
+        android:pathData="M28,4 L80,4 A24,24 0 0 1 104,28 L104,80 A24,24 0 0 1 80,104 L28,104 A24,24 0 0 1 4,80 L4,28 A24,24 0 0 1 28,4 Z" />
+
+    <!-- 内层浅粉光圈 -->
+    <path
+        android:fillColor="#33FFFFFF"
+        android:pathData="M32,14 L76,14 A18,18 0 0 1 94,32 L94,76 A18,18 0 0 1 76,94 L32,94 A18,18 0 0 1 14,76 L14,32 A18,18 0 0 1 32,14 Z" />
+
+    <!-- 白色皇冠 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M28,74 L28,44 L42,56 L54,34 L66,56 L80,44 L80,74 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M28,78 L80,78 L80,84 L28,84 Z" />
+</vector>

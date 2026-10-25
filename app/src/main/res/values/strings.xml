@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">儿童桌面</string>
+    <string name="not_installed">应用没了，长按菜单键 2 秒重选</string>
+    <string name="no_target_title">还没选应用</string>
+    <string name="no_target_hint">长按菜单键 2 秒选择</string>
+    <string name="no_target_toast">还没选应用，长按菜单键 2 秒选择</string>
+    <string name="target_missing_hint">长按菜单键 2 秒重选</string>
+    <string name="target_missing_toast">这个应用已经卸载了，长按菜单键 2 秒重选</string>
+    <string name="parent_pin">家长验证</string>
+    <string name="pin_wrong">不对</string>
+    <string name="back">返回</string>
+
+    <string name="time_settings_title">观看时长</string>
+    <string name="time_settings_tip">左右调数字，上下换行，改完即生效</string>
+    <string name="row_single">每次最多看</string>
+    <string name="row_rest">每次休息</string>
+    <string name="row_daily">每天总共</string>
+    <string name="row_gate">家长验证</string>
+    <string name="row_auto">自动进应用</string>
+    <string name="acc_desc">只检测当前前台应用，孩子跳到别的应用时把儿童桌面拉回来。不读屏幕内容，不收集数据。</string>
+    <string name="row_voice">休息语音</string>
+    <string name="row_preview">试听语音</string>
+    <string name="row_preview_hint">按 OK 播放</string>
+    <string name="row_reset">今天已看 %1$d 分钟</string>
+    <string name="row_reset_hint">按 OK 清零</string>
+    <string name="row_default">恢复默认</string>
+    <string name="row_default_hint">按 OK</string>
+
+    <string name="value_unlimited">不限</string>
+    <string name="value_no_rest">不休息</string>
+    <string name="value_on">开</string>
+    <string name="value_off">关</string>
+    <string name="minutes">%1$d 分钟</string>
+</resources>

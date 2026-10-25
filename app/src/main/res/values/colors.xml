@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  两套皮肤共用的语义色。
+  命名规则：cream_* = 奶油儿童（默认），space_* = 深空影院。
+  布局和代码一律不直接引用这里的颜色，只引用 themes.xml 里的主题 attr
+  （kioskText / kioskCard…），这样切换主题不用动任何布局。
+-->
+<resources>
+
+    <!-- ============ 奶油儿童（默认） ============ -->
+    <color name="cream_bg_top">#FFE3EE</color>
+    <color name="cream_bg_bottom">#FFF8FC</color>
+    <color name="cream_card">#FFFFFF</color>
+    <color name="cream_card_focus">#FFF0F6</color>
+    <color name="cream_accent">#FF6FAE</color>
+    <color name="cream_deep">#E0457F</color>
+    <color name="cream_soft">#FFD6E7</color>
+    <color name="cream_ripple">#66E8558F</color>
+    <color name="cream_text">#6B3B52</color>
+    <color name="cream_dim">#A97690</color>
+    <color name="cream_line">#F3C6D9</color>
+    <color name="cream_error">#D6336C</color>
+
+    <!-- ============ 深空影院 ============ -->
+    <color name="space_bg_top">#17203C</color>
+    <color name="space_bg_bottom">#0C1220</color>
+    <color name="space_card">#1D2745</color>
+    <color name="space_card_focus">#27335C</color>
+    <color name="space_accent">#57C7F0</color>
+    <color name="space_deep">#9ADCFF</color>
+    <color name="space_soft">#2A3A66</color>
+    <color name="space_ripple">#4D57C7F0</color>
+    <color name="space_text">#EAF0FA</color>
+    <color name="space_dim">#8FA0C4</color>
+    <color name="space_line">#2E3D63</color>
+    <color name="space_error">#FF7A8A</color>
+    <!-- 深色底上按下去要用更深的蓝，亮青色配白字会看不清 -->
+    <color name="space_press">#1E88C7</color>
+    <color name="space_press_deep">#2A93C9</color>
+
+</resources>

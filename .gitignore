@@ -1,0 +1,47 @@
+# Built application files
+*.apk
+*.aab
+*.aar
+*.ap_
+*.dex
+
+# Generated files
+bin/
+gen/
+out/
+release/
+build/
+
+# Gradle
+.gradle/
+
+# Local configuration (SDK path, signing, etc.)
+local.properties
+gradle.properties.local
+
+# Keystores / secrets
+*.jks
+*.keystore
+*.p12
+
+# Logs
+*.log
+
+# Android Studio / IntelliJ
+*.iml
+.idea/
+captures/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Intermediate / local audio assets (voice generator outputs live in res/raw as mp3)
+*.wav
+
+# External native build
+.externalNativeBuild/
+.cxx/
+
+# Node (if any tooling uses it)
+node_modules/

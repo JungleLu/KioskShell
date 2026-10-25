@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  家长门禁弹窗。
+  尺寸按 1920x1080 / density 320（= 540dp 高）设计：键盘每行必须是固定高度，
+  绝对不能再加 layout_rowWeight —— 加了权重会把剩余高度全分给行，一行就能占满整屏。
+-->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="22dp"
+        android:paddingTop="14dp"
+        android:paddingEnd="22dp"
+        android:paddingBottom="16dp">
+
+        <TextView
+            android:id="@+id/gateTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="家长验证"
+            android:textColor="?attr/kioskTitle"
+            android:textSize="17sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/gatePrompt"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:gravity="center"
+            android:maxLines="1"
+            android:text=""
+            android:textColor="?attr/kioskText"
+            android:textSize="26sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/gateInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:gravity="center"
+            android:minHeight="34dp"
+            android:text=""
+            android:textColor="?attr/kioskAccent"
+            android:textSize="26sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/gateError"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:minHeight="20dp"
+            android:text=""
+            android:textColor="?attr/kioskError"
+            android:textSize="13sp" />
+
+        <GridLayout
+            android:id="@+id/gateKeys"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:columnCount="3"
+            android:rowCount="4">
+
+            <TextView
+                android:id="@+id/k1"
+                style="@style/GateKey"
+                android:layout_columnWeight="1"
+                android:nextFocusDown="@+id/k4"
+                android:text="1" />
+
+            <TextView
+                android:id="@+id/k2"
+                style="@style/GateKey"
+                android:layout_columnWeight="1"
+                android:nextFocusDown="@+id/k5"
+                android:text="2" />
+
+            <TextView
+                android:id="@+id/k3"
+                style="@style/GateKey"
+                android:layout_columnWeight="1"
+                android:nextFocusDown="@+id/k6"
+                android:text="3" />
+
+            <TextView
+                android:id="@+id/k4"
+                style="@style/GateKey"
+                android:layout_columnWeight="1"
+                android:nextFocusDown="@+id/k7"
+                android:text="4" />
+
+            <TextView
+                android:id="@+id/k5"
+                style="@style/GateKey"
+                android:layout_columnWeight="1"
+                android:nextFocusDown="@+id/k8"
+                android:text="5" />
+
+            <TextView
+                android:id="@+id/k6"
+                style="@style/GateKey"
+                android:layout_columnWeight="1"
+                android:nextFocusDown="@+id/k9"
+                android:text="6" />
+
+            <TextView
+                android:id="@+id/k7"
+                style="@style/GateKey"
+                android:layout_columnWeight="1"
+                android:nextFocusDown="@+id/kDel"
+                android:text="7" />
+
+            <TextView
+                android:id="@+id/k8"
+                style="@style/GateKey"
+                android:layout_columnWeight="1"
+                android:nextFocusDown="@+id/k0"
+                android:text="8" />
+
+            <TextView
+                android:id="@+id/k9"
+                style="@style/GateKey"
+                android:layout_columnWeight="1"
+                android:nextFocusDown="@+id/kOk"
+                android:text="9" />
+
+            <TextView
+                android:id="@+id/kDel"
+                style="@style/GateKey"
+                android:layout_columnWeight="1"
+                android:nextFocusDown="@+id/gateCancel"
+                android:text="⌫"
+                android:textSize="22sp" />
+
+            <TextView
+                android:id="@+id/k0"
+                style="@style/GateKey"
+                android:layout_columnWeight="1"
+                android:nextFocusDown="@+id/gateCancel"
+                android:text="0" />
+
+            <TextView
+                android:id="@+id/kOk"
+                style="@style/GateKey"
+                android:layout_columnWeight="1"
+                android:nextFocusDown="@+id/gateCancel"
+                android:text="确定"
+                android:textColor="?attr/kioskTitle"
+                android:textSize="18sp" />
+        </GridLayout>
+
+        <TextView
+            android:id="@+id/gateCancel"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="8dp"
+            android:background="?attr/kioskPill"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:minWidth="150dp"
+            android:paddingStart="30dp"
+            android:paddingEnd="30dp"
+            android:text="取消"
+            android:textColor="?attr/kioskText"
+            android:textSize="15sp" />
+
+    </LinearLayout>
+</ScrollView>

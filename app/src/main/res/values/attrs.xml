@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  皮肤 attr：两套主题给这些 attr 赋不同的值，布局里统一用 ?attr/ 引用。
+  新增主题时只要再写一个 Theme.Kiosk.XXX 样式，布局一行都不用改。
+-->
+<resources>
+
+    <!-- 背景类（drawable，每个主题一份同名不同值的文件） -->
+    <attr name="kioskBgWindow" format="reference" />
+    <attr name="kioskCard" format="reference" />
+    <attr name="kioskRow" format="reference" />
+    <attr name="kioskKey" format="reference" />
+    <attr name="kioskPill" format="reference" />
+    <attr name="kioskPanel" format="reference" />
+
+    <!-- 文字类（颜色） -->
+    <attr name="kioskText" format="reference|color" />
+    <attr name="kioskTextDim" format="reference|color" />
+    <attr name="kioskAccent" format="reference|color" />
+    <attr name="kioskTitle" format="reference|color" />
+    <attr name="kioskError" format="reference|color" />
+
+</resources>

@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  主题总控。
+  - Theme.Kiosk       基座，值 = 奶油儿童（清单里引用它，setTheme 之前的那一刻也是它）
+  - Theme.Kiosk.Cream 奶油儿童（默认）
+  - Theme.Kiosk.Space 深空影院
+  - Theme.Kiosk.Dialog.Cream / .Space  弹窗版，AppCompat 的 AlertDialog.Builder 会自动读
+    活动主题里的 alertDialogTheme，所以弹窗不用手动包 ContextThemeWrapper
+
+  活动里切换：KioskTheme.apply(activity) 在 super.onCreate 之前调用即可。
+-->
+<resources>
+
+    <style name="Theme.Kiosk" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="android:windowBackground">@drawable/bg_window_cream</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowActionBar">false</item>
+        <!-- 系统深色模式不许反色，否则粉底会变成灰底 -->
+        <item name="android:forceDarkAllowed">false</item>
+        <item name="colorPrimary">@color/cream_accent</item>
+        <item name="colorPrimaryDark">@color/cream_deep</item>
+        <item name="colorAccent">@color/cream_accent</item>
+        <item name="android:textColorPrimary">@color/cream_text</item>
+        <item name="android:textColorSecondary">@color/cream_dim</item>
+        <item name="android:colorControlHighlight">@color/cream_ripple</item>
+        <item name="alertDialogTheme">@style/Theme.Kiosk.Dialog.Cream</item>
+        <!-- 皮肤 attr：默认给奶油儿童的值 -->
+        <item name="kioskBgWindow">@drawable/bg_window_cream</item>
+        <item name="kioskCard">@drawable/bg_card_cream</item>
+        <item name="kioskRow">@drawable/bg_row_cream</item>
+        <item name="kioskKey">@drawable/bg_key_cream</item>
+        <item name="kioskPill">@drawable/bg_pill_cream</item>
+        <item name="kioskPanel">@drawable/bg_panel_cream</item>
+        <item name="kioskText">@color/cream_text</item>
+        <item name="kioskTextDim">@color/cream_dim</item>
+        <item name="kioskAccent">@color/cream_accent</item>
+        <item name="kioskTitle">@color/cream_deep</item>
+        <item name="kioskError">@color/cream_error</item>
+    </style>
+
+    <!-- 奶油儿童：基座就是它，什么都不用写 -->
+    <style name="Theme.Kiosk.Cream" parent="Theme.Kiosk" />
+
+    <!-- 深空影院：把皮肤 attr 全部翻成深色值 -->
+    <style name="Theme.Kiosk.Space" parent="Theme.Kiosk">
+        <item name="android:windowBackground">@drawable/bg_window_space</item>
+        <item name="colorPrimary">@color/space_accent</item>
+        <item name="colorPrimaryDark">@color/space_bg_top</item>
+        <item name="colorAccent">@color/space_accent</item>
+        <item name="android:textColorPrimary">@color/space_text</item>
+        <item name="android:textColorSecondary">@color/space_dim</item>
+        <item name="android:colorControlHighlight">@color/space_ripple</item>
+        <item name="alertDialogTheme">@style/Theme.Kiosk.Dialog.Space</item>
+        <item name="kioskBgWindow">@drawable/bg_window_space</item>
+        <item name="kioskCard">@drawable/bg_card_space</item>
+        <item name="kioskRow">@drawable/bg_row_space</item>
+        <item name="kioskKey">@drawable/bg_key_space</item>
+        <item name="kioskPill">@drawable/bg_pill_space</item>
+        <item name="kioskPanel">@drawable/bg_panel_space</item>
+        <item name="kioskText">@color/space_text</item>
+        <item name="kioskTextDim">@color/space_dim</item>
+        <item name="kioskAccent">@color/space_accent</item>
+        <item name="kioskTitle">@color/space_deep</item>
+        <item name="kioskError">@color/space_error</item>
+    </style>
+
+    <!-- ============ 弹窗版（不能从 Theme.Kiosk 派生，否则会继承全屏 + 背景图） ============ -->
+
+    <style name="Theme.Kiosk.Dialog.Cream" parent="Theme.AppCompat.Light.Dialog.Alert">
+        <item name="android:windowBackground">@drawable/bg_dialog_cream</item>
+        <!-- 窗口尺寸在 ParentGateDialog 里按屏幕像素算，这里不设比例，免得两套规则打架 -->
+        <item name="android:backgroundDimAmount">0.42</item>
+        <item name="colorAccent">@color/cream_accent</item>
+        <item name="android:colorControlHighlight">@color/cream_ripple</item>
+        <item name="android:textColorPrimary">@color/cream_text</item>
+        <item name="android:textColorAlertDialogListItem">@color/cream_text</item>
+        <item name="android:forceDarkAllowed">false</item>
+        <item name="kioskBgWindow">@drawable/bg_window_cream</item>
+        <item name="kioskCard">@drawable/bg_card_cream</item>
+        <item name="kioskRow">@drawable/bg_row_cream</item>
+        <item name="kioskKey">@drawable/bg_key_cream</item>
+        <item name="kioskPill">@drawable/bg_pill_cream</item>
+        <item name="kioskPanel">@drawable/bg_panel_cream</item>
+        <item name="kioskText">@color/cream_text</item>
+        <item name="kioskTextDim">@color/cream_dim</item>
+        <item name="kioskAccent">@color/cream_accent</item>
+        <item name="kioskTitle">@color/cream_deep</item>
+        <item name="kioskError">@color/cream_error</item>
+    </style>
+
+    <style name="Theme.Kiosk.Dialog.Space" parent="Theme.AppCompat.Dialog.Alert">
+        <item name="android:windowBackground">@drawable/bg_dialog_space</item>
+        <item name="android:backgroundDimAmount">0.5</item>
+        <item name="colorAccent">@color/space_accent</item>
+        <item name="android:colorControlHighlight">@color/space_ripple</item>
+        <item name="android:textColorPrimary">@color/space_text</item>
+        <item name="android:textColorSecondary">@color/space_dim</item>
+        <item name="android:textColorAlertDialogListItem">@color/space_text</item>
+        <item name="android:forceDarkAllowed">false</item>
+        <item name="kioskBgWindow">@drawable/bg_window_space</item>
+        <item name="kioskCard">@drawable/bg_card_space</item>
+        <item name="kioskRow">@drawable/bg_row_space</item>
+        <item name="kioskKey">@drawable/bg_key_space</item>
+        <item name="kioskPill">@drawable/bg_pill_space</item>
+        <item name="kioskPanel">@drawable/bg_panel_space</item>
+        <item name="kioskText">@color/space_text</item>
+        <item name="kioskTextDim">@color/space_dim</item>
+        <item name="kioskAccent">@color/space_accent</item>
+        <item name="kioskTitle">@color/space_deep</item>
+        <item name="kioskError">@color/space_error</item>
+    </style>
+
+    <style name="KioskDialogTitle" parent="TextAppearance.AppCompat.Title">
+        <item name="android:textColor">?attr/kioskTitle</item>
+    </style>
+
+    <!-- 门禁数字键盘的键：高度固定，绝不能加 layout_rowWeight（会把整屏拉满） -->
+    <style name="GateKey">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">58dp</item>
+        <item name="android:layout_margin">4dp</item>
+        <item name="android:background">?attr/kioskKey</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textColor">?attr/kioskText</item>
+        <item name="android:textSize">24sp</item>
+    </style>
+
+</resources>

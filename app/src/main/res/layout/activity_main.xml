@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?attr/kioskBgWindow">
+
+    <!--
+      目标应用卡片行：选几个就排几个。卡片在代码里按数量动态决定大小
+      （1 个大卡 / 2 个中卡 / 3 个及以上小卡），空状态显示占位卡。
+    -->
+    <LinearLayout
+        android:id="@+id/appsRow"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:orientation="horizontal" />
+
+    <TextView
+        android:id="@+id/timeText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|center_horizontal"
+        android:layout_marginTop="34dp"
+        android:paddingStart="40dp"
+        android:paddingEnd="40dp"
+        android:text=""
+        android:textColor="?attr/kioskTitle"
+        android:textSize="19sp" />
+
+    <TextView
+        android:id="@+id/hintText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="26dp"
+        android:paddingStart="40dp"
+        android:paddingEnd="40dp"
+        android:text=""
+        android:textColor="?attr/kioskTextDim"
+        android:textSize="14sp" />
+
+    <!-- 主题切换：放在首页，家长一眼能看到。纯装饰，点一下循环换肤 -->
+    <TextView
+        android:id="@+id/themeBtn"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_marginEnd="20dp"
+        android:layout_marginBottom="20dp"
+        android:background="?attr/kioskPill"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:minHeight="38dp"
+        android:paddingStart="18dp"
+        android:paddingEnd="18dp"
+        android:text="主题"
+        android:textColor="?attr/kioskTextDim"
+        android:textSize="13sp" />
+
+</FrameLayout>
