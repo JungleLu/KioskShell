@@ -143,6 +143,32 @@ powershell -ExecutionPolicy Bypass -File tools\tv-install.ps1 -TvIp 192.168.x.x 
 
 **每次重装 APK，无障碍授权会失效**（系统行为，绕不过），脚本的 `-EnableWatchdog` 就是补这个的；不重装就不用管。
 
+### 海信 JUUI / VIDAA 的强锁死路（三种都实测过，别再试第四遍）
+
+实测平台：海信 `VIDAA_TV` / Android 11 / SDK 30。结论：**强锁（Device Owner + Lock Task）在这台电视上做不到**，四条路子全被固件挡死。
+
+| 尝试 | 结果 |
+|---|---|
+| `pm list features` 查 `android.software.device_admin` | **空** —— 特性被阉掉，系统层面就没有这个能力 |
+| `adb shell dpm set-device-owner com.kidstv.kiosk/.KioskAdmin` | `java.lang.RuntimeException: Can't set package ... as device owner.` 直接拒绝 |
+| 应用内 `RoleManager.ROLE_HOME` 申请默认桌面 | 不弹确认框（`cmd role` 在这台电视上也是 `Unknown command`） |
+| `adb shell cmd package set-home-activity com.kidstv.kiosk/.HomeAlias` | **返回 `Success`，但完全无效** |
+
+最后一条特别容易骗人 —— 命令自己说成功了，实际按 HOME 还是回聚好看。`logcat` 抓到的时间线：
+
+```
+14:01:28.326  START ... cat=[HOME] cmp=com.jamdeo.tv.vod/com.ju.main.launcher.LauncherActivity
+14:01:28.584  START ... cmp=com.kidstv.kiosk/.MainActivity      ← 258ms 后看门狗拉回
+```
+
+也就是说：**HOME 被固件钉死在聚好看，任何"默认桌面"设置它都不认**。现在之所以能锁住，是因为看门狗在 258 毫秒内把人拉回来，观感上是"闪一下"。
+
+这台电视上就剩三个选项：
+
+1. **保持看门狗**（推荐）：零风险，随时从家长菜单退出，孩子基本感知不到闪动。
+2. **停用系统桌面**：`adb shell pm disable-user --user 0 com.jamdeo.tv.vod`，HOME 物理上没有聚好看可选。代价是电视上暂时没有原桌面，**儿童桌面一旦出问题只能靠电脑 ADB 恢复**（`adb shell pm enable com.jamdeo.tv.vod`），聚好看的影视入口也一起没了。
+3. **外接安卓盒子**：盒子设成 Device Owner 后 HOME / 返回 / 最近任务全失效，是唯一真正的强锁。电视只当屏幕，壳装盒子上，逻辑一行都不用改。
+
 ## 锁法：看门狗模式（唯一能锁住又能自己退出的）
 
 先说结论：**靠"把自己设成默认桌面"在海信这类固件上完全无效**，系统桌面永远是聚好看。实测：
@@ -214,6 +240,16 @@ powershell -ExecutionPolicy Bypass -File tools\tv-install.ps1 -TvIp 192.168.x.x 
 | 更新 APK 后无障碍被关 | 系统升级应用时会自动关掉它的无障碍服务 | 重新打开一次（最容易被忽略的一条） |
 
 **实测（2026-10-26，海信 VIDAA_TV / Android 11）**：无障碍开着时重启，几秒内自动进儿童桌面；这时把悬浮窗权限设成 `ignore` 也一样能拉起。
+
+三次重启的完整时间线（adb 轮询抓的，不是估算）：
+
+| 版本 | 落地耗时 | 悬浮窗权限 | 中间过程 |
+|---|---|---|---|
+| v1.27 | 34 秒 | `ignore` | 直接进儿童桌面 |
+| v1.27 | 38 秒 | `ignore` | 直接进儿童桌面 |
+| v1.28 | **32 秒** | `ignore` | 28 秒时先落聚好看（`VipAlbumActivity`），32 秒被看门狗拉回 |
+
+也就是说：**开机自启跟悬浮窗权限完全无关**，只要 `locked=true` + 无障碍开着就成立。中间那 4 秒的聚好看属于正常——固件开机后会先起自己的桌面，看门狗随后接管。
 
 ### 怎么确认自启正常
 
