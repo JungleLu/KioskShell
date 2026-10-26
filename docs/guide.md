@@ -80,6 +80,8 @@ python3 tools/kiosk.py doctor 192.168.1.50   # 体检：系统版本、能不能
 python3 tools/kiosk.py install 192.168.1.50  # 装 APK + 开无障碍，装完即可用
 ```
 
+> 上面 `192.168.1.50` 是**示例**，换成你电视的局域网 IP；不知道就先跑 `discover`，它会把你的地址和该敲的命令打出来。设备连上之后，`doctor` / `install` 都可以不带 IP。
+
 装完再去电视上操作三步（选应用 / 改密码），见 [README 的 30 秒上手](../README.md#30-秒上手)。
 
 脚本会先打印电视品牌 / 型号 / Android 版本 / 有没有 Device Admin 特性 / 系统桌面包名，再动手；每一步都有回读校验（无障碍写完会 `settings get` 回读确认，不是设完就完）。
@@ -320,7 +322,7 @@ adb pair 192.168.1.50:41923 123456       # 电视上显示的配对端口 + 六�
 adb connect 192.168.1.50:37201           # 电视上显示的连接端口
 ```
 
-两个端口不一样，配对码是一次性的，过期就回电视上重新生成。
+`192.168.1.50` 是示例，换成你电视的 IP。两个端口不一样，配对码是一次性的，过期就回电视上重新生成。
 
 ### 先确认这台电视是不是安卓
 
@@ -364,8 +366,8 @@ ADB 只是"装包"的一种方式，不是唯一：
 一条命令装完（Windows 上把 `python3` 换成 `python`）：
 
 ```bash
-python3 tools/kiosk.py discover              # 找电视
-python3 tools/kiosk.py doctor 192.168.1.50   # 体检，顺便确认要不要强锁
+python3 tools/kiosk.py discover              # 找电视（不知道 IP 就先跑这个）
+python3 tools/kiosk.py doctor 192.168.1.50   # 体检，顺便确认要不要强锁（IP 换成你电视的）
 python3 tools/kiosk.py install 192.168.1.50  # 装 + 开无障碍
 ```
 
@@ -375,10 +377,10 @@ python3 tools/kiosk.py install 192.168.1.50  # 装 + 开无障碍
 
 | 想要 | 命令 |
 |---|---|
-| 只要开机自启 / HOME 拉回（开机自启的唯一前提） | `python3 tools/kiosk.py watchdog <IP>` |
-| 让锁屏页盖得更快（可选，海信会周期性回收） | `python3 tools/kiosk.py overlay <IP>` |
-| 卸载干净（连配置一起） | `python3 tools/kiosk.py uninstall <IP>` |
-| 救命：系统桌面被停用了 | `python3 tools/kiosk.py recover-launcher <IP>` |
+| 只要开机自启 / HOME 拉回（开机自启的唯一前提） | `python3 tools/kiosk.py watchdog <电视IP>` |
+| 让锁屏页盖得更快（可选，海信会周期性回收） | `python3 tools/kiosk.py overlay <电视IP>` |
+| 卸载干净（连配置一起） | `python3 tools/kiosk.py uninstall <电视IP>` |
+| 救命：系统桌面被停用了 | `python3 tools/kiosk.py recover-launcher <电视IP>` |
 
 **强锁（Device Owner）和激进锁法没有封装进脚本**，因为风险高、而且多数国产固件根本不支持。要试就手敲：
 

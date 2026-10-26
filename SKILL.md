@@ -10,6 +10,10 @@ description: 把 Android TV / 电视盒子变成「只能看一个 App」的儿�
 
 命令里 `python3` 在 Windows 上换成 `python`。下面统一写 `python3`。
 
+**`<电视IP>` 是占位符，没有任何默认值。** 必须替换成用户电视的真实局域网 IP，
+不要照抄示例里的 `192.168.1.50`（那只是个示例，直接跑会连到别的设备或者超时）。
+设备已经连上时这些命令都可以省略 IP。
+
 ## 开始之前先问清楚两件事
 
 1. **电视的 IP**，或者电视已经用 USB 连着电脑。
@@ -88,10 +92,10 @@ OK  已安装 1.2x
 |---|---|---|
 | `没找到 adb` | 电脑没装 platform-tools | macOS `brew install --cask android-platform-tools`；Windows 装 SDK Platform-Tools 并加 PATH；或用 `--adb` 指定路径 |
 | `连不上` / `unauthorized` | 电视没开调试 / 没点授权 / 不同网段 | 逐条提示用户；海信要同时开「USB 调试」和「网络调试」 |
-| 装完开机不进桌面 | 无障碍没开（装 APK 会关掉它） | `python3 tools/kiosk.py watchdog <IP>` |
+| 装完开机不进桌面 | 无障碍没开（装 APK 会关掉它） | `python3 tools/kiosk.py watchdog <电视IP>` |
 | 「临时回原桌面」后重启不进桌面 | 旧版（≤1.28）的放行状态靠开机广播清，部分固件不发该广播 | 升级到 1.29+；旧版让用户手动打开一次儿童桌面 |
 | 按 HOME 会闪一下原桌面再回来 | 固件钉死了系统桌面，这是正常行为 | 不用修，说明一下即可 |
-| 电视上没有任何桌面了 | 之前用了激进锁法把系统桌面停用了 | `python3 tools/kiosk.py recover-launcher <IP>` |
+| 电视上没有任何桌面了 | 之前用了激进锁法把系统桌面停用了 | `python3 tools/kiosk.py recover-launcher <电视IP>` |
 | 卸载报 `DEVICE_OWNER` | 它还是设备所有者 | 先在电视家长菜单里「撤销 Device Owner」 |
 
 ## 交付时说什么

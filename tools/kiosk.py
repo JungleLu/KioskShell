@@ -7,13 +7,14 @@ Windows / macOS / Linux 同一套命令，只依赖 Python 3.7+ 和 adb。
 应用包名从 build.gradle.kts 读。
 
 常用：
-    python3 tools/kiosk.py discover            # 找电视
-    python3 tools/kiosk.py doctor              # 体检：能不能装、缺什么
-    python3 tools/kiosk.py install 192.168.1.5 # 装 APK + 开无障碍
-    python3 tools/kiosk.py watchdog            # 只开无障碍（开机自启靠它）
-    python3 tools/kiosk.py overlay             # 恢复悬浮窗权限（可选）
-    python3 tools/kiosk.py recover-launcher    # 救命：重新启用被停用的系统桌面
+    python3 tools/kiosk.py discover             # 找电视，它会打印该敲的命令
+    python3 tools/kiosk.py doctor               # 体检：能不能装、缺什么
+    python3 tools/kiosk.py install 192.168.1.50 # 装 APK + 开无障碍（IP 换成你电视的）
+    python3 tools/kiosk.py watchdog             # 只开无障碍（开机自启靠它）
+    python3 tools/kiosk.py overlay              # 恢复悬浮窗权限（可选）
+    python3 tools/kiosk.py recover-launcher     # 救命：重新启用被停用的系统桌面
 
+不用 IP 也行：上面任一命令省略 target，就作用于当前唯一已连接的设备。
 Windows 下把 python3 换成 python 即可。
 """
 
@@ -215,9 +216,16 @@ def connect(adb: str, target: str, wait: int = 45) -> str:
 
 # ---------------------------------------------------------------- 子命令
 
+def _python_cmd() -> str:
+    """按当前平台给出可直接粘贴的解释器名。"""
+    return "python" if os.name == "nt" else "python3"
+
+
 def cmd_discover(args, adb: str) -> None:
+    py = _python_cmd()
     step("已连接的设备")
     devices = list_devices(adb)
+    online = [d for d, st in devices if st == "device"]
     if devices:
         for d, st in devices:
             print(f"    {d:<28} {st}")
@@ -232,10 +240,23 @@ def cmd_discover(args, adb: str) -> None:
     if ips:
         for ip, port in sorted(set(ips)):
             print(f"    {ip}:{port}")
-        print("\n    用法：python tools/kiosk.py doctor " + ips[0][0])
     else:
         print("    （没发现。电视没开调试，或者不在同一网段）")
-        print("    电视 IP 可以在 设置 → 网络 → 当前网络 里看到")
+
+    step("下一步")
+    if len(online) == 1:
+        print("    已有一台连上了，下面这些命令可以不带 IP：")
+        print(f"      {py} tools/kiosk.py doctor")
+        print(f"      {py} tools/kiosk.py install")
+    elif len(online) > 1:
+        print("    连着多台，用 -s 指定一台（序列号见上）：")
+        print(f"      {py} tools/kiosk.py doctor -s {online[0]}")
+    elif ips:
+        print("    拿上面任意一个 IP 去连（地址要换成实际的）：")
+        print(f"      {py} tools/kiosk.py doctor {ips[0][0]}")
+        print(f"      {py} tools/kiosk.py install {ips[0][0]}")
+    else:
+        print("    电视 IP 到 设置 → 网络 → 当前网络（或路由器后台）里看")
 
 
 def cmd_doctor(args, dev: Device) -> None:
@@ -265,7 +286,7 @@ def cmd_doctor(args, dev: Device) -> None:
     step("儿童桌面")
     installed = dev.sh(f"pm list packages {PKG}")
     if PKG not in installed:
-        bad("还没装。下一步：python tools/kiosk.py install <电视IP>")
+        bad(f"还没装。下一步：{_python_cmd()} tools/kiosk.py install（设备已连上，不必再带 IP）")
         return
     ver = dev.sh(f"dumpsys package {PKG}")
     m = re.search(r"versionName=(\S+)", ver)
@@ -435,16 +456,21 @@ def cmd_uninstall(args, dev: Device) -> None:
 # ---------------------------------------------------------------- 入口
 
 def main() -> None:
+    py = _python_cmd()
     p = argparse.ArgumentParser(
         prog="kiosk.py",
         description="儿童桌面（KioskShell）命令行工具 —— Windows / macOS / Linux 通用",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""例子:
-  python3 tools/kiosk.py discover
-  python3 tools/kiosk.py doctor 192.168.1.5
-  python3 tools/kiosk.py install 192.168.1.5
-  python3 tools/kiosk.py watchdog
-  python3 tools/kiosk.py recover-launcher
+        epilog=f"""192.168.1.50 只是示例，换成你电视的局域网 IP。
+不知道电视 IP：先跑 discover，它会把该敲的命令直接打出来。
+设备已经连上时，所有命令都可以省略 IP。
+
+例子:
+  {py} tools/kiosk.py discover
+  {py} tools/kiosk.py doctor 192.168.1.50
+  {py} tools/kiosk.py install 192.168.1.50
+  {py} tools/kiosk.py watchdog
+  {py} tools/kiosk.py recover-launcher
 """,
     )
     p.add_argument("--adb", default="", help="adb 可执行文件路径（默认自动查找）")
@@ -458,7 +484,11 @@ def main() -> None:
         sp = sub.add_parser(name, help=help_text)
         if with_target:
             sp.add_argument("target", nargs="?", default="",
-                            help="电视 IP，例如 192.168.1.5（也可用 -s 指定已连接设备）")
+                            help="电视 IP，例如 192.168.1.50（换成你自己的）；"
+                                 "不填则用当前唯一已连接的设备")
+        # 子命令后面也认 -s（SUPPRESS：没传就不覆盖顶层已解析的值）
+        sp.add_argument("-s", "--serial", default=argparse.SUPPRESS,
+                        help="设备序列号，多设备时用")
         return sp
 
     add("discover", "找电视（已连接的 + 局域网里广播的）", with_target=False)
@@ -491,8 +521,9 @@ def main() -> None:
         if not online:
             die(
                 "没有连上任何电视。\n"
-                f"  带上电视 IP 再跑：python3 tools/kiosk.py {args.cmd} 192.168.1.5\n"
-                "  不知道 IP：python3 tools/kiosk.py discover"
+                "  带上电视 IP 再跑（192.168.1.50 换成你电视的）：\n"
+                f"    {py} tools/kiosk.py {args.cmd} 192.168.1.50\n"
+                f"  不知道 IP：{py} tools/kiosk.py discover"
             )
         if len(online) > 1:
             print("检测到多台设备，用 -s 指定一台：")

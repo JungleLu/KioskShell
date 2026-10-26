@@ -21,9 +21,13 @@
 前提：**安卓**电视或盒子（Android 5.0+），电视和电脑在同一个 Wi-Fi，电视里打开「网络调试 / ADB 调试」。
 只有「VIDAA 版本号」、找不到「Android 版本」的那种电视装不了（[怎么确认](docs/guide.md#先确认这台电视是不是安卓)）。
 
+> 本文出现的 IP 都只是示例：写成 `192.168.1.50` 或 `<电视IP>`，**一律换成你电视的局域网 IP**，照抄连不上。
+> 不知道 IP：先跑 `discover`，它会把你的地址和该敲的命令直接打出来；或在电视上 `设置 → 网络 → 当前网络` 里看。
+> 设备一旦连上，后面的命令都可以省略 IP。
+
 ### 方式一：让 AI 帮你装（最省事）
 
-把这句话发给 Claude Code / Cursor / WorkBuddy 之类的 AI 助手：
+把这句话发给 Claude Code / Cursor / WorkBuddy 之类的 AI 助手（把 IP 换成你电视的）：
 
 > 读一下这个仓库的 `SKILL.md`，按它的步骤把我的电视装成儿童桌面，电视 IP 是 `192.168.1.50`
 
@@ -34,8 +38,10 @@
 | 做什么 | Windows | macOS / Linux |
 |---|---|---|
 | 找电视（不知道 IP 时用） | `python tools\kiosk.py discover` | `python3 tools/kiosk.py discover` |
-| 体检（能不能装、缺什么） | `python tools\kiosk.py doctor 192.168.1.50` | `python3 tools/kiosk.py doctor 192.168.1.50` |
-| 装 APK + 开无障碍 | `python tools\kiosk.py install 192.168.1.50` | `python3 tools/kiosk.py install 192.168.1.50` |
+| 体检（能不能装、缺什么） | `python tools\kiosk.py doctor <电视IP>` | `python3 tools/kiosk.py doctor <电视IP>` |
+| 装 APK + 开无障碍 | `python tools\kiosk.py install <电视IP>` | `python3 tools/kiosk.py install <电视IP>` |
+
+`<电视IP>` 指换成真实地址（例如 `192.168.1.50`，不要带尖括号）；电视已经连上时直接省略，命令会作用于当前唯一设备。
 
 只需要 Python 3 和 adb，Windows / macOS / Linux 同一套命令。Windows 上 `python` 如果不是命令，换成 `py -3`。
 没装 adb：macOS `brew install --cask android-platform-tools`；Windows 装 [Platform-Tools](https://developer.android.com/tools/releases/platform-tools) 后加进 PATH。
@@ -73,11 +79,12 @@
 
 | 想要 | 命令 |
 |---|---|
-| 只开无障碍（开机自启的唯一前提） | `python3 tools/kiosk.py watchdog <IP>` |
-| 恢复悬浮窗权限（可选） | `python3 tools/kiosk.py overlay <IP>` |
-| 卸载干净 | `python3 tools/kiosk.py uninstall <IP>` |
-| 救命：电视没桌面了 | `python3 tools/kiosk.py recover-launcher <IP>` |
+| 只开无障碍（开机自启的唯一前提） | `python3 tools/kiosk.py watchdog <电视IP>` |
+| 恢复悬浮窗权限（可选） | `python3 tools/kiosk.py overlay <电视IP>` |
+| 卸载干净 | `python3 tools/kiosk.py uninstall <电视IP>` |
+| 救命：电视没桌面了 | `python3 tools/kiosk.py recover-launcher <电视IP>` |
 
+`<电视IP>` 是占位符，换成真实地址（例如 `192.168.1.50`，不要带尖括号）；设备已连上时可以整段省略。
 Windows 下把 `python3` 换成 `python`。`overlay` 也可以直接双击 `tools\fix-overlay.bat`。
 
 ## 常见问题
