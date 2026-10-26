@@ -1,4 +1,13 @@
-# Windows 批处理按原样存储：仓库内是 CRLF + GBK，
+# Windows 批处理按原样存储：仓库内是 CRLF + ASCII/GBK，
 # 避免换行/编码被 git 改写后 cmd 解析出错（中文会被截断成乱码）
 *.bat -text
 *.cmd -text
+
+# 其余脚本统一 LF，三个平台都能直接跑
+*.py  text eol=lf
+*.sh  text eol=lf
+
+# 图片按二进制
+*.jpg -text
+*.png -text
+*.mp3 -text

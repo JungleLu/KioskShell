@@ -50,6 +50,16 @@ class KioskWatchService : AccessibilityService() {
 
         /** 锁屏页最小重提间隔：孩子按 HOME/返回逃掉时把它再盖回去 */
         private const val LOCK_COOLDOWN_MS = 6000L
+
+        /**
+         * 系统界面窗口，不算"跑到别的应用去了"。
+         * 状态栏、音量条、电源菜单、授权弹窗都挂在这里，一秒钟能来好几个事件，
+         * 不排除的话会把孩子正在看的画面反复打断。
+         *
+         * 这两个是 AOSP 固定包名，各品牌定制固件（含小米、海信）也都沿用，
+         * 所以这里可以直接写死 —— 真正会变的桌面包名是运行时探测的。
+         */
+        private val SYSTEM_UI_PKGS = setOf("com.android.systemui", "android")
     }
 
     private val handler = Handler(Looper.getMainLooper())
@@ -101,7 +111,7 @@ class KioskWatchService : AccessibilityService() {
         if (event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val pkg = event.packageName?.toString().orEmpty()
         if (pkg.isEmpty()) return
-        if (pkg == "com.android.systemui" || pkg == "android") return
+        if (pkg in SYSTEM_UI_PKGS) return
         if (isCurrentIme(pkg)) return
 
         lastFg = pkg

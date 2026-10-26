@@ -49,3 +49,7 @@ Thumbs.db
 
 # Node (if any tooling uses it)
 node_modules/
+
+# Python
+__pycache__/
+*.py[cod]

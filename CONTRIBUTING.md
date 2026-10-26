@@ -52,5 +52,7 @@ gradle assembleDebug --no-daemon
 ## 代码约定
 
 - 包名 `com.kidstv.kiosk`，**不写死任何电视品牌 / 系统桌面包名**，探测全部运行时做。
-- 主题用 `res/values/attrs.xml` 的 11 个皮肤 attr + `themes.xml` 的两套样式实现，加新皮肤只加样式和同名 drawable，布局不用改（见 README「加一套新皮肤」）。
+- 主题用 `res/values/attrs.xml` 的 11 个皮肤 attr + `themes.xml` 的两套样式实现，加新皮肤只加样式和同名 drawable，布局不用改（见 [docs/guide.md 的「加一套新皮肤」](docs/guide.md#加一套新皮肤以墨绿森林为例)）。
 - 家长验证、时长管控、锁定状态等配置走 `Config.kt` 的 `SharedPreferences`。
+- 部署脚本只有 `tools/kiosk.py` 一份，**不要再加 `*.ps1` / `*.cmd` / `*.bat` 的分支逻辑**（Windows 缺 python 时的兜底除外）。跨平台靠 Python，不是靠维护两套脚本。
+- 文档：`README.md` 只放入门内容（目标 150 行以内），细节写进 `docs/guide.md`。
