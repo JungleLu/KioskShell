@@ -33,6 +33,22 @@ gradle assembleDebug --no-daemon
 - 一个大功能拆成几个小提交更好 review。
 - 提 PR 前请先 `rebase` / `merge` 最新的 `main`，保证能直接编过。
 
+## 发版
+
+1. 改 `app/build.gradle.kts` 的 `versionCode`（+1）和 `versionName`，构建 `assembleDebug`
+2. 在 `CHANGELOG.md` 顶部加一节（只写用户能感知的变化和踩过的坑）
+3. 提交、推到 `main`，然后发 Release 并挂上 APK：
+
+```bash
+gh release create v1.30 KioskShell-v1.30-debug.apk \
+  --target main \
+  --title "v1.30 —— 一句话说清这版修了什么" \
+  --notes-file release-notes.md
+```
+
+Release 说明里写清楚：修了什么（症状 + 原因）、怎么装、这一版有什么已知限制；顺带附 APK 的 SHA-256。
+标签名用 `v1.29` 这种形式，与 `versionName` 对应。`--target` 只认分支名，写 commit SHA 会 422。
+
 ## 语音文案怎么改（开发用）
 
 两条提示语音由 `tools/voice/make_voice.py` 生成（Qwen3-TTS 克隆 + ffmpeg 后处理），输出写入 `app/src/main/res/raw/`：

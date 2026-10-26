@@ -3,10 +3,13 @@
 ![platform](https://img.shields.io/badge/platform-Android%20TV%205.0%2B-3ddc84)
 ![license](https://img.shields.io/badge/license-MIT-blue)
 ![deps](https://img.shields.io/badge/permissions-none%20beyond%20accessibility-lightgrey)
+![release](https://img.shields.io/github/v/release/JungleLu/KioskShell?label=release)
 
 **English** — Turn an Android TV or TV box into a single-app kiosk for kids: one big icon on screen, a parent PIN to get out, and an automatic break when the time is up. Works on any Android TV (5.0+); no brand is hard-coded.
 
 把安卓电视变成「只能看一个 App」的儿童模式：桌面上只有一个大图标，退出要家长密码，到点自动弹「休息一下」。**不刷机、不 root、不联云。**
+
+**[⬇ 下载最新版 APK](https://github.com/JungleLu/KioskShell/releases/latest)** · 约 3.2 MB · Android 5.0+ · 覆盖安装保留配置
 
 ![儿童桌面首页](docs/images/home.jpg)
 
@@ -48,7 +51,7 @@
 
 ### 方式三：完全不想碰命令行
 
-1. 把 `KioskShell-v*-debug.apk`（版本号以 Releases 最新版为准）拷到 U 盘，插电视安装
+1. 从 [Releases](https://github.com/JungleLu/KioskShell/releases/latest) 下载 `KioskShell-v*-debug.apk`，拷到 U 盘，插电视安装
 2. 电视上打开「儿童桌面」，**长按遥控器菜单键 2 秒**，输密码 `123456`
 3. 家长菜单 →「开启儿童桌面」→ 按提示跳到无障碍设置，打开「儿童桌面」
 
