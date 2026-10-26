@@ -89,6 +89,7 @@ OK  已安装 1.2x
 | `没找到 adb` | 电脑没装 platform-tools | macOS `brew install --cask android-platform-tools`；Windows 装 SDK Platform-Tools 并加 PATH；或用 `--adb` 指定路径 |
 | `连不上` / `unauthorized` | 电视没开调试 / 没点授权 / 不同网段 | 逐条提示用户；海信要同时开「USB 调试」和「网络调试」 |
 | 装完开机不进桌面 | 无障碍没开（装 APK 会关掉它） | `python3 tools/kiosk.py watchdog <IP>` |
+| 「临时回原桌面」后重启不进桌面 | 旧版（≤1.28）的放行状态靠开机广播清，部分固件不发该广播 | 升级到 1.29+；旧版让用户手动打开一次儿童桌面 |
 | 按 HOME 会闪一下原桌面再回来 | 固件钉死了系统桌面，这是正常行为 | 不用修，说明一下即可 |
 | 电视上没有任何桌面了 | 之前用了激进锁法把系统桌面停用了 | `python3 tools/kiosk.py recover-launcher <IP>` |
 | 卸载报 `DEVICE_OWNER` | 它还是设备所有者 | 先在电视家长菜单里「撤销 Device Owner」 |

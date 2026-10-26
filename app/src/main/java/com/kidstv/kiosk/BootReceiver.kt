@@ -24,8 +24,11 @@ import androidx.core.app.NotificationCompat
  *    或者**拥有被系统绑定的服务**——无障碍服务就是。
  *
  * v1.27 的结论：**开机拉起交给看门狗（KioskWatchService），不在这里硬拉**。
- * 这里只负责清「本次放行」、拉起计时服务，顺带在"有悬浮窗权限"时抢先拉一次省几秒；
+ * 这里只负责拉起计时服务，顺带在"有悬浮窗权限"时抢先拉一次省几秒；
  * 没开无障碍才退回全屏 Intent 通知（系统留给后台应用的后门）。
+ *
+ * v1.29 起这里**不再负责清「本次放行」**（见 `Config.passOnce`）：实测这个广播在部分
+ * 固件上根本不来，"靠广播清状态"会让放行状态永久挂着，开机不自启。
  */
 class BootReceiver : BroadcastReceiver() {
 
@@ -39,7 +42,10 @@ class BootReceiver : BroadcastReceiver() {
         val boot = Intent.ACTION_BOOT_COMPLETED
         if (action != boot && action != "android.intent.action.QUICKBOOT_POWERON") return
 
-        // 开机一律结束「本次放行」：家长放行只是这一轮，重启后照旧锁回去
+        // 开机一律结束「本次放行」。
+        // 注意：这一步只是顺手，**不能指望它**——部分固件不发 BOOT_COMPLETED，
+        // 或者广播结束后进程立刻被回收、写盘还没落地。真正的判定在 Config.passOnce
+        // 的 getter 里（用 boot_id 判断换了次开机就作废），不依赖任何广播。
         Config.passOnce = false
 
         if (!Config.locked) return

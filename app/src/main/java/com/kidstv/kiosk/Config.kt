@@ -1,6 +1,13 @@
 package com.kidstv.kiosk
 
+import android.os.SystemClock
+
 object Config {
+
+    /** 「本次放行」的三个键：值本身 + 写入时刻的 uptime + 当时的 boot_id，后两个用来判断重启 */
+    private const val KEY_PASS_ONCE = "pass_once"
+    private const val KEY_PASS_ONCE_AT = "pass_once_at"
+    private const val KEY_PASS_ONCE_BOOT = "pass_once_boot"
 
     /**
      * 要锁定的目标应用，**可多选**。空集合 = 家长还没选，或者主动选了「不锁定任何应用」。
@@ -156,12 +163,15 @@ object Config {
             App.prefs.edit().putInt("gate_fails", value).apply()
         }
 
-    /** 冷却结束时刻，用 elapsedRealtime 记（改系统时间绕不过去） */
+    /**
+     * 冷却结束时刻，用 elapsedRealtime 记（改系统时间绕不过去）。
+     *
+     * 但 elapsedRealtime 每次开机归零，存下来的绝对值重启后会变成"未来的某个时刻"
+     * （可能是几天后），家长重启一次就再也输不进密码。所以配 [readDeadline] 用。
+     */
     var gateCoolUntil: Long
-        get() = App.prefs.getLong("gate_cool", 0L)
-        set(value) {
-            App.prefs.edit().putLong("gate_cool", value).apply()
-        }
+        get() = readDeadline("gate_cool")
+        set(value) = writeDeadline("gate_cool", value)
 
     fun clearChallenge() {
         App.prefs.edit()
@@ -201,21 +211,47 @@ object Config {
             App.prefs.edit().putBoolean("kiosk_mode", value).apply()
         }
 
-    /** 看门狗暂停到这个时刻（elapsedRealtime 毫秒）。家长去系统设置时别被弹回来 */
+    /**
+     * 看门狗暂停到这个时刻（elapsedRealtime 毫秒）。家长去系统设置时别被弹回来。
+     *
+     * 这个值如果跨了重启没作废，看门狗会一直以为"家长还在设置里"，
+     * 开机自启和 HOME 拉回**一起失效**，而且毫无提示。所以必须按开机次作废。
+     */
     var watchdogPauseUntil: Long
-        get() = App.prefs.getLong("watch_pause", 0L)
-        set(value) {
-            App.prefs.edit().putLong("watch_pause", value).apply()
-        }
+        get() = readDeadline("watch_pause")
+        set(value) = writeDeadline("watch_pause", value)
 
     /**
      * 本次放行：这几天想自己看会儿电视，先回聚好看，但**不清除锁定**。
-     * 重启电视（BootReceiver 会清掉）之后照旧锁回儿童桌面。
+     * 重启电视之后照旧锁回儿童桌面。
+     *
+     * **重启判定不靠开机广播**（v1.29）。以前的写法是"放行时置 true，`BootReceiver`
+     * 收到开机广播再清掉"，实测会漏：部分固件不发 `BOOT_COMPLETED`，或者发了但广播
+     * 结束后进程立刻被回收、`apply()` 的异步写盘还没落地。结果是 `pass_once` 一直挂着
+     * true，看门狗以为家长还在放行，开机不拉界面；等家长手动打开儿童桌面，
+     * `onResume` 才发现并清掉 —— 表现就是"放行后重启不自启，重开一次才恢复"。
+     *
+     * 现在的做法：放行时顺手记下「boot_id + 当时的 uptime」，读的时候发现换了次开机
+     * 就自动作废，不依赖任何广播，也不需要谁来清。
      */
     var passOnce: Boolean
-        get() = App.prefs.getBoolean("pass_once", false)
+        get() {
+            val sp = App.prefs
+            if (!sp.getBoolean(KEY_PASS_ONCE, false)) return false
+            // at == 0 说明是旧版本写下的（那时还没有这两个键），无从判断，直接作废
+            if (!BootId.sinceReboot(sp.getLong(KEY_PASS_ONCE_AT, 0L), sp.getString(KEY_PASS_ONCE_BOOT, "").orEmpty())) {
+                return true
+            }
+            sp.edit().putBoolean(KEY_PASS_ONCE, false).commit()
+            return false
+        }
         set(value) {
-            App.prefs.edit().putBoolean("pass_once", value).apply()
+            // 用 commit 而不是 apply：这个值决定"重启后锁不锁"，丢了就要等家长手动打开才恢复
+            App.prefs.edit()
+                .putBoolean(KEY_PASS_ONCE, value)
+                .putLong(KEY_PASS_ONCE_AT, SystemClock.elapsedRealtime())
+                .putString(KEY_PASS_ONCE_BOOT, BootId.current)
+                .commit()
         }
 
     /**
@@ -253,4 +289,34 @@ object Config {
         set(value) {
             App.prefs.edit().putString("theme", value).apply()
         }
+
+    // ---------------- 跨重启的状态 ----------------
+
+    /**
+     * 读一个「uptime 基准的截止时刻」。
+     *
+     * `elapsedRealtime()` 每次开机从 0 开始，所以把它存进 prefs 再加个偏移量，
+     * 一旦跨了重启，这个绝对值就会指向"重启后还要过很久"的将来 ——
+     * 表现是看门狗被永久暂停（不自启、不拉回）、或者家长被永久锁在密码冷却里。
+     *
+     * 所以写入时一并记下 boot_id，读的时候发现换了次开机就直接作废。
+     */
+    private fun readDeadline(key: String): Long {
+        val sp = App.prefs
+        val v = sp.getLong(key, 0L)
+        if (v <= 0L) return 0L
+        val at = sp.getLong("${key}_at", 0L)
+        val boot = sp.getString("${key}_boot", "").orEmpty()
+        if (!BootId.sinceReboot(at, boot)) return v
+        sp.edit().putLong(key, 0L).commit()
+        return 0L
+    }
+
+    private fun writeDeadline(key: String, value: Long) {
+        App.prefs.edit()
+            .putLong(key, value)
+            .putLong("${key}_at", SystemClock.elapsedRealtime())
+            .putString("${key}_boot", BootId.current)
+            .commit()
+    }
 }
