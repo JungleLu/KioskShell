@@ -37,7 +37,7 @@
 | 体检（能不能装、缺什么） | `python tools\kiosk.py doctor 192.168.1.50` | `python3 tools/kiosk.py doctor 192.168.1.50` |
 | 装 APK + 开无障碍 | `python tools\kiosk.py install 192.168.1.50` | `python3 tools/kiosk.py install 192.168.1.50` |
 
-只需要 Python 3 和 adb，Windows / macOS / Linux 同一套命令。
+只需要 Python 3 和 adb，Windows / macOS / Linux 同一套命令。Windows 上 `python` 如果不是命令，换成 `py -3`。
 没装 adb：macOS `brew install --cask android-platform-tools`；Windows 装 [Platform-Tools](https://developer.android.com/tools/releases/platform-tools) 后加进 PATH。
 
 ### 方式三：完全不想碰命令行
