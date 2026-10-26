@@ -8,6 +8,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
@@ -225,11 +226,63 @@ object Kiosk {
                 Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME),
                 PackageManager.MATCH_DEFAULT_ONLY
             )
-            val other = all.firstOrNull { it.activityInfo.packageName != ctx.packageName }
-            if (other != null) return other.activityInfo.packageName
+            val others = all.filter { it.activityInfo.packageName != ctx.packageName }
+            // 电视上可能同时装了当贝桌面之类的第三方桌面，按系统应用优先挑，
+            // 否则"回原桌面"可能把人送到别的第三方桌面去
+            val system = others.firstOrNull {
+                (it.activityInfo.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+            }
+            if (system != null) return system.activityInfo.packageName
+            others.firstOrNull()?.let { return it.activityInfo.packageName }
         } catch (e: Exception) {
         }
         return ""
+    }
+
+    /**
+     * 回到系统自带桌面。**必须显式指定包名，不能发隐式 HOME Intent。**
+     *
+     * 原因：在尊重「默认桌面」设置的电视（原生 Android TV、索尼、多数盒子）上，
+     * 本应用就是默认桌面，隐式 HOME 会原样解析回自己 —— 家长点「临时回原桌面」等于没反应。
+     * 海信这类把系统桌面钉死的固件恰好掩盖了这个问题，所以只在一台电视上测是测不出来的。
+     */
+    fun launchStockLauncher(ctx: Context): Boolean {
+        val pkg = stockLauncherPackage(ctx)
+        if (pkg.isNotEmpty()) {
+            try {
+                ctx.startActivity(
+                    Intent(Intent.ACTION_MAIN)
+                        .addCategory(Intent.CATEGORY_HOME)
+                        .setPackage(pkg)
+                        .addFlags(
+                            Intent.FLAG_ACTIVITY_NEW_TASK or
+                                Intent.FLAG_INCLUDE_STOPPED_PACKAGES
+                        )
+                )
+                return true
+            } catch (e: Exception) {
+            }
+            try {
+                val launch = ctx.packageManager.getLaunchIntentForPackage(pkg)
+                if (launch != null) {
+                    launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    ctx.startActivity(launch)
+                    return true
+                }
+            } catch (e: Exception) {
+            }
+        }
+        // 探测不到（系统桌面被藏了 / 停用了）→ 退回隐式 HOME，让系统自己决定
+        return try {
+            ctx.startActivity(
+                Intent(Intent.ACTION_MAIN)
+                    .addCategory(Intent.CATEGORY_HOME)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+            true
+        } catch (e: Exception) {
+            false
+        }
     }
 
     /** 系统桌面的显示名（聚好看 / 小米电视桌面 / 当贝桌面…），探测不到时退回「系统桌面」 */

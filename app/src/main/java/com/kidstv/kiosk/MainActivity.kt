@@ -686,13 +686,9 @@ class MainActivity : AppCompatActivity() {
         Kiosk.setHomeLocked(this, false)
         Toast.makeText(this, "已退出，按 HOME 回原桌面", Toast.LENGTH_LONG).show()
 
-        val home = Intent(Intent.ACTION_MAIN)
-        home.addCategory(Intent.CATEGORY_HOME)
-        home.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-        try {
-            startActivity(home)
-        } catch (e: Exception) {
-        }
+        // 显式指定系统桌面包名：这时本应用可能刚被撤掉默认桌面身份，
+        // 但系统缓存还没刷新，隐式 HOME 仍有几率打回自己
+        Kiosk.launchStockLauncher(this)
     }
 
     /**
@@ -708,13 +704,9 @@ class MainActivity : AppCompatActivity() {
             "已回原桌面，重启或重开儿童桌面后恢复锁定",
             Toast.LENGTH_LONG
         ).show()
-        val home = Intent(Intent.ACTION_MAIN)
-        home.addCategory(Intent.CATEGORY_HOME)
-        home.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-        try {
-            startActivity(home)
-        } catch (e: Exception) {
-        }
+        // 关键：这里本应用仍是默认桌面，隐式 HOME 会解析回自己（"点了没反应"）。
+        // 必须显式指定系统桌面包名，各品牌运行时探测。
+        Kiosk.launchStockLauncher(this)
     }
 
     /**
@@ -751,8 +743,8 @@ class MainActivity : AppCompatActivity() {
                 "这个权限已经不再是必需品。\n" +
                     "到点弹休息页、开机拉起界面，都改走无障碍通道了，不靠它。\n\n" +
                     "给了的好处：锁屏页能盖得更快、更靠前。\n\n" +
-                    "海信/VIDAA 的毛病：在电视设置页点「允许」，\n" +
-                    "几分钟后系统会自己关掉（实测，不留任何日志）。\n" +
+                    "部分固件的毛病（实测海信/VIDAA）：在电视设置页点「允许」，\n" +
+                    "几分钟后系统会自己关掉（不留任何日志）。\n" +
                     "要稳就用电脑 ADB 授权一次：\n\n" +
                     cmd
             )
