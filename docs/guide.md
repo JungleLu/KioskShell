@@ -554,6 +554,7 @@ adb shell dpm set-device-owner com.kidstv.kiosk/.KioskAdmin
 ```
 app/src/main/java/com/kidstv/kiosk/
 ├── App.kt               Application
+├── BootId.kt            判断"这是第几次开机"（读 /proc/sys/kernel/random/boot_id），用于让跨重启的状态自动作废
 ├── Config.kt            目标包名、密码、锁定开关、时长参数、门禁状态、主题（SharedPreferences）
 ├── KioskTheme.kt        主题切换：两套皮肤 + 按 attr 取色
 ├── Timer.kt             计时核心：单次 / 每日 / 休息的秒数账本
@@ -567,7 +568,7 @@ app/src/main/java/com/kidstv/kiosk/
 ├── Kiosk.kt             弱锁 + 强锁的全部逻辑
 ├── KioskWatchService.kt 无障碍服务：看门狗拉回 + 到点盖休息页 + 开机主动拉起（系统绑定服务，不受后台启动限制）
 ├── KioskAdmin.kt        DeviceAdminReceiver（Device Owner 必需）
-├── BootReceiver.kt      开机自启
+├── BootReceiver.kt      开机广播：拉起计时服务、有悬浮窗时抢先拉一次界面（不承担清状态，见 BootId.kt）
 └── MainActivity.kt      桌面 + 按键拦截 + 家长菜单
 
 app/src/main/res/
@@ -621,3 +622,7 @@ tools/                       开发与部署辅助脚本（不参与打包）
 5. `MainActivity.showThemePicker()` 的 `values` / `names` 两个数组各加一项
 
 完事。家长菜单里就能选到新皮肤，`recreate()` 后全局生效。
+
+---
+
+每个版本改了什么、踩过哪些坑，见 [CHANGELOG.md](../CHANGELOG.md)。
