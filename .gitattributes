@@ -1,0 +1,4 @@
+# Windows 批处理按原样存储：仓库内是 CRLF + GBK，
+# 避免换行/编码被 git 改写后 cmd 解析出错（中文会被截断成乱码）
+*.bat -text
+*.cmd -text

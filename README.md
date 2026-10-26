@@ -242,7 +242,10 @@ adb connect <电视IP>:5555
 adb shell cmd appops set com.kidstv.kiosk SYSTEM_ALERT_WINDOW allow
 ```
 
-嫌命令麻烦就直接跑 `tools/fix-overlay.bat`（Windows 双击即可，默认 IP `192.168.10.81`，可传参改）。
+嫌敲命令麻烦就直接跑 `tools/fix-overlay.bat`（Windows 双击即可）：
+- `adb` 会自动在 `PATH` / `%LOCALAPPDATA%\Android\Sdk\platform-tools` / `%ANDROID_HOME%` 里找；也可以设 `ADB_PATH` 环境变量、或把 `adb.exe` 放进 `tools/`、或在 `tools/adb-path.txt` 里写一行完整路径（这三个都是本机自用，已 gitignore）。
+- 电视若已连过会直接复用，否则提示你输 IP；也可 `fix-overlay.bat 192.168.1.50` 传参。
+- 权限重启后失效时再跑一次即可。
 
 > **为什么 app 不能自己恢复**：`SYSTEM_ALERT_WINDOW` 是特殊权限（appops），普通应用连 `MANAGE_APP_OPS_MODES` 都拿不到，只能靠 shell / root 写入。所以 v1.26 起，权限丢失时 app 直接显示本机 IP + 上面这条命令，而不是把你再引去设置页。
 
@@ -286,7 +289,7 @@ adb shell cmd appops set com.kidstv.kiosk SYSTEM_ALERT_WINDOW allow
 powershell -ExecutionPolicy Bypass -File tools\tv-install.ps1 -Find
 
 # 电视上会显示 "IP:连接端口" 和 "配对端口 + 配对码"，两个端口不一样
-powershell -ExecutionPolicy Bypass -File tools\tv-install.ps1 -TvIp 192.168.10.66 `
+powershell -ExecutionPolicy Bypass -File tools\tv-install.ps1 -TvIp 192.168.x.x `
     -Port 37201 -PairPort 41923 -PairCode 123456
 ```
 
@@ -340,7 +343,7 @@ ADB 只是"装包"的一种方式，不是唯一：
 python tools\find-tv.py
 
 # 第二步：装
-powershell -ExecutionPolicy Bypass -File tools\tv-install.ps1 -TvIp 192.168.10.66
+powershell -ExecutionPolicy Bypass -File tools\tv-install.ps1 -TvIp 192.168.x.x
 ```
 
 第一次连的时候电视会弹「是否允许 USB 调试」，用遥控器选**允许**（有「一律允许」就勾上）。脚本会自己等到你按完。
@@ -544,10 +547,12 @@ app/src/main/res/
 ├── layout/activity_time_settings.xml + item_time_row.xml  设置页
 └── drawable/bg_*_cream.xml · bg_*_space.xml  每套皮肤一份（7 个：窗口/卡片/行/按键/胶囊/面板/弹窗），布局一律用 ?attr/ 取色
 
-tools/                       不开 U 盘用的（Wi-Fi 远程安装）
+tools/                       开发与部署辅助脚本（不参与打包）
 ├── install-to-tv.cmd        双击就能用：输 IP → 选要不要顺便授权/上强锁
 ├── tv-install.ps1           真正干活的：连接、安装、验收、可选授权
-└── find-tv.py               扫局域网里开着 5555 的电视
+├── find-tv.py               扫局域网里开着 5555 的电视
+├── fix-overlay.bat          一键用 ADB 恢复悬浮窗权限（海信/VIDAA 必备）
+└── voice/make_voice.py      重新生成两条提示语音（需本机 Qwen3-TTS 模型）
 ```
 
 ## 想改的地方

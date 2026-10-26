@@ -37,7 +37,16 @@ gradle assembleDebug --no-daemon
 
 两条提示语音由 `tools/voice/make_voice.py` 生成（Qwen3-TTS 克隆 + ffmpeg 后处理），输出写入 `app/src/main/res/raw/`：
 
-- 脚本里的模型路径、参考音频、输出目录是**作者本机绝对路径**，使用前需要改成本机路径，且本机需装好 `qwen_tts`、`torch`、`soundfile` 和 `ffmpeg`。
+- 本机需装好 `qwen_tts`、`torch`、`soundfile` 和 `ffmpeg`。
+- 路径全部走环境变量，不用改代码：
+
+  | 变量 | 作用 | 默认值 |
+  |---|---|---|
+  | `QWEN_TTS_ROOT` | 模型与参考音频的根目录 | 仓库根下的 `voice/` |
+  | `QWEN_TTS_MODEL` | 模型目录 | `$QWEN_TTS_ROOT/_models/Qwen3-TTS-12Hz-1.7B-Base` |
+  | `VOICE_REF_WAV` | 参考音频（建议 10–15 秒干净人声） | `$QWEN_TTS_ROOT/_ref/ref_female.wav` |
+  | `VOICE_OUT` | wav 输出目录 | `voice/out/` |
+
 - 不打算重训音色的话，直接用任意 mp3 覆盖 `res/raw/voice_rest.mp3` / `voice_day_over.mp3` 也行，文件名和时长锚点逻辑不要动。
 
 ## 代码约定

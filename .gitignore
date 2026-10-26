@@ -19,6 +19,10 @@ build/
 local.properties
 gradle.properties.local
 
+# Local adb location / binary for tools/fix-overlay.bat (machine-specific)
+tools/adb-path.txt
+tools/adb.exe
+
 # Keystores / secrets
 *.jks
 *.keystore

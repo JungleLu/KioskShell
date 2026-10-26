@@ -5,7 +5,7 @@
 用法：
     python find-tv.py                 # 扫本机所在 /24 网段的 5555
     python find-tv.py --ports 5555,8009,9999
-    python find-tv.py --net 192.168.10.0/24
+    python find-tv.py --net 192.168.1.0/24
 
 为什么会找不到：电视上的「ADB 调试 / 网络调试」没打开，或者电视和电脑不在同一个网段。
 端口没开时这里一定扫不到，先回去开开关。
@@ -66,7 +66,7 @@ async def scan(net, ports, timeout):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--net", help="网段，如 192.168.10.0/24；不填则自动取本机 /24")
+    ap.add_argument("--net", help="网段，如 192.168.1.0/24；不填则自动取本机 /24")
     ap.add_argument("--ports", default="5555", help="要探测的端口，逗号分隔")
     ap.add_argument("--timeout", type=float, default=0.45, help="单台超时秒数")
     args = ap.parse_args()

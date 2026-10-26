@@ -1,43 +1,104 @@
 @echo off
-chcp 65001 >nul
-setlocal
+chcp 936 >nul
+setlocal enabledelayedexpansion
 
-REM æ¢å¤ã€Œå„¿ç«¥æ¡Œé¢ã€çš„æ‚¬æµ®çª—æƒé™ã€‚
-REM èƒŒæ™¯ï¼šVIDAA / æµ·ä¿¡ç”µè§†ä¼šå‘¨æœŸæ€§å›žæ”¶"åœ¨è®¾ç½®é¡µæ‰‹åŠ¨æŽˆäºˆ"çš„æ‚¬æµ®çª—æƒé™ï¼Œ
-REM       ä½†é€šè¿‡ ADB å†™å…¥çš„ä¸ä¼šè¢«å›žæ”¶ï¼ˆå®žæµ‹ 40+ åˆ†é’Ÿç¨³å®šï¼‰ã€‚
+REM ============================================================
+REM  »Ö¸´¡¸¶ùÍ¯×ÀÃæ¡¹µÄÐü¸¡´°È¨ÏÞ£¨SYSTEM_ALERT_WINDOW£©
 REM
-REM ç”¨æ³•ï¼š
-REM   fix-overlay.bat                ç”¨é»˜è®¤ IP 192.168.10.81
-REM   fix-overlay.bat 192.168.1.50   æŒ‡å®šç”µè§† IP
+REM  ÎªÊ²Ã´ÐèÒªÕâ¸ö½Å±¾£º
+REM    VIDAA / º£ÐÅµçÊÓ»áÖÜÆÚÐÔ»ØÊÕ"ÔÚÉèÖÃÒ³ÊÖ¶¯ÊÚÓè"µÄÐü¸¡´°È¨ÏÞ
+REM    £¨Êµ²â 4-5 ·ÖÖÓÒ»´Î£¬logcat ÎÞÈÎºÎ¼ÇÂ¼£©£¬µ«Í¨¹ý ADB Ð´ÈëµÄ
+REM    appops ²»»á±»»ØÊÕ£¨Êµ²â 40+ ·ÖÖÓÎÈ¶¨£©¡£
+REM    ËùÒÔÕýÈ·×ö·¨²»ÊÇ·´¸´È¥ÉèÖÃÒ³µã"ÔÊÐí"£¬¶øÊÇÓÃ ADB Ö±½ÓÐ´Èë¡£
+REM
+REM  Ç°Ìá£ºµçÊÓÒÑ¿ªÆô ADB µ÷ÊÔ£¨ÉèÖÃ - ¹ØÓÚ - Á¬µã°æ±¾ºÅ - ¿ª·¢ÕßÑ¡Ïî
+REM        - ¿ªÆô¡¸ÍøÂçµ÷ÊÔ / USB µ÷ÊÔ¡¹£©£¬ÇÒµçÄÔÓëµçÊÓÔÚÍ¬Ò»¾ÖÓòÍø¡£
+REM
+REM  ÓÃ·¨£º
+REM    fix-overlay.bat                 ×Ô¶¯ÕÒÒÑÁ¬½ÓµÄµçÊÓ£¬»òÌáÊ¾ÊäÈë IP
+REM    fix-overlay.bat 192.168.1.50    Ö¸¶¨µçÊÓ IP
+REM ============================================================
 
 set "PKG=com.kidstv.kiosk"
-set "TV_IP=%~1"
-if "%TV_IP%"=="" set "TV_IP=192.168.10.81"
 
-set "FALLBACK=D:\ProgramData\WorkBuddy\2026-10-21-13-41-57\.toolchain\android-sdk\platform-tools\adb.exe"
-
+REM ---------- 1. ÕÒ adb ----------
+REM ²éÕÒË³Ðò£ºADB_PATH »·¾³±äÁ¿ -> PATH -> tools\adb-path.txt£¨±¾»ú×ÔÓÃ£¬ÒÑ gitignore£©
+REM           -> tools\adb.exe -> Android SDK ³£¼ûÎ»ÖÃ
 set "ADB="
-where adb >nul 2>nul
-if not errorlevel 1 set "ADB=adb"
-if defined ADB goto haveadb
-if exist "%FALLBACK%" set "ADB=%FALLBACK%"
-if defined ADB goto haveadb
 
-echo [x] æ‰¾ä¸åˆ° adbã€‚è¯·å®‰è£… Android platform-tools å¹¶æŠŠ adb åŠ å…¥ PATHï¼Œ
-echo     æˆ–ä¿®æ”¹æœ¬è„šæœ¬é‡Œçš„ FALLBACK è·¯å¾„ã€‚
-pause
-exit /b 1
+if defined ADB_PATH if exist "%ADB_PATH%" set "ADB=%ADB_PATH%"
 
-:haveadb
-echo [1/3] è¿žæŽ¥ç”µè§† %TV_IP% ...
-"%ADB%" connect %TV_IP%:5555
+if not defined ADB (
+    where adb >nul 2>nul
+    if not errorlevel 1 set "ADB=adb"
+)
 
-echo [2/3] è®¾ç½®æ‚¬æµ®çª—æƒé™ä¸º allow ...
-"%ADB%" -s %TV_IP%:5555 shell cmd appops set %PKG% SYSTEM_ALERT_WINDOW allow
+if not defined ADB if exist "%~dp0adb-path.txt" (
+    set /p ADB_LINE=<"%~dp0adb-path.txt"
+    if exist "!ADB_LINE!" set "ADB=!ADB_LINE!"
+)
 
-echo [3/3] éªŒè¯ ...
-"%ADB%" -s %TV_IP%:5555 shell cmd appops get %PKG% SYSTEM_ALERT_WINDOW
+if not defined ADB if exist "%~dp0adb.exe" set "ADB=%~dp0adb.exe"
+if not defined ADB if exist "%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe" set "ADB=%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe"
+if not defined ADB if defined ANDROID_HOME if exist "%ANDROID_HOME%\platform-tools\adb.exe" set "ADB=%ANDROID_HOME%\platform-tools\adb.exe"
+if not defined ADB if defined ANDROID_SDK_ROOT if exist "%ANDROID_SDK_ROOT%\platform-tools\adb.exe" set "ADB=%ANDROID_SDK_ROOT%\platform-tools\adb.exe"
+
+if not defined ADB (
+    echo [x] ÕÒ²»µ½ adb¡£
+    echo.
+    echo     ÈýÖÖ½â·¨£¬ÈÎÑ¡Ò»ÖÖ£º
+    echo       [1] °²×° Android SDK Platform-Tools ²¢¼ÓÈë PATH
+    echo           https://developer.android.com/tools/releases/platform-tools
+    echo       [2] °Ñ adb.exe ·Åµ½±¾½Å±¾Í¬Ä¿Â¼£ºtools\adb.exe
+    echo       [3] ÔÚ±¾½Å±¾Í¬Ä¿Â¼½¨ adb-path.txt£¬ÀïÃæÐ´ adb.exe µÄÍêÕûÂ·¾¶
+    echo.
+    pause
+    exit /b 1
+)
+
+REM ---------- 2. È·¶¨µçÊÓµØÖ· ----------
+set "TV_IP=%~1"
+set "TARGET="
+
+if defined TV_IP goto havedev
+
+REM Ã»´«²Î£ºÏÈ¿´ÓÐÃ»ÓÐÒÑ¾­Á¬ÉÏµÄÉè±¸
+for /f "skip=1 tokens=1,2" %%a in ('"%ADB%" devices') do (
+    if not defined TARGET if /i "%%b"=="device" set "TARGET=%%a"
+)
+if defined TARGET (
+    echo [i] ¼ì²âµ½ÒÑÁ¬½ÓµÄÉè±¸£º!TARGET!
+    goto checkadb
+)
+
+echo ÇëÊäÈëµçÊÓµÄ IP µØÖ·£¨µçÊÓÉÏ£ºÉèÖÃ - ÍøÂç - µ±Ç°ÍøÂç - IPv4 µØÖ·£©
+set /p TV_IP=IP:
+if not defined TV_IP (
+    echo [x] Ã»ÊäÈë IP£¬ÍË³ö¡£
+    pause
+    exit /b 1
+)
+
+:havedev
+echo %TV_IP% | findstr ":" >nul
+if errorlevel 1 (set "TARGET=%TV_IP%:5555") else (set "TARGET=%TV_IP%")
+
+:checkadb
+REM ---------- 3. Á¬½Ó + ÊÚÈ¨ + ÑéÖ¤ ----------
+echo.
+echo [1/3] Á¬½ÓµçÊÓ %TARGET% ...
+"%ADB%" connect %TARGET%
+
+echo [2/3] °ÑÐü¸¡´°È¨ÏÞÐ´³É allow ...
+"%ADB%" -s %TARGET% shell cmd appops set %PKG% SYSTEM_ALERT_WINDOW allow
+
+echo [3/3] ÑéÖ¤ ...
+echo.
+"%ADB%" -s %TARGET% shell cmd appops get %PKG% SYSTEM_ALERT_WINDOW
 
 echo.
-echo å®Œæˆã€‚ä¸Šé¢æ˜¾ç¤º "SYSTEM_ALERT_WINDOW: allow" å³æˆåŠŸã€‚
+echo --------------------------------------------
+echo ÉÏÃæ³öÏÖ SYSTEM_ALERT_WINDOW: allow ¾ÍÊÇ³É¹¦ÁË¡£
+echo Õâ¸öÊÚÈ¨²»»á±»µçÊÓ¹Ì¼þ»ØÊÕ£»ÖØÆôºóÊ§Ð§Ê±ÔÙÅÜÒ»´Î¼´¿É¡£
+echo --------------------------------------------
 pause

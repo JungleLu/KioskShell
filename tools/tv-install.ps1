@@ -7,19 +7,19 @@
     电视上需要先打开「ADB 调试 / 网络调试」，并且和这台电脑连同一个 WiFi。
 
 .EXAMPLE
-    powershell -ExecutionPolicy Bypass -File tools\tv-install.ps1 -TvIp 192.168.10.66
+    powershell -ExecutionPolicy Bypass -File tools\tv-install.ps1 -TvIp 192.168.x.x
 
 .EXAMPLE
     # 装完顺手把悬浮窗权限给掉（省得在电视上手动点）
-    powershell -ExecutionPolicy Bypass -File tools\tv-install.ps1 -TvIp 192.168.10.66 -GrantOverlay
+    powershell -ExecutionPolicy Bypass -File tools\tv-install.ps1 -TvIp 192.168.x.x -GrantOverlay
 
 .EXAMPLE
     # 一条命令上强锁（电视不能登录任何账号，否则 dpm 会拒绝）
-    powershell -ExecutionPolicy Bypass -File tools\tv-install.ps1 -TvIp 192.168.10.66 -GrantOverlay -SetOwner
+    powershell -ExecutionPolicy Bypass -File tools\tv-install.ps1 -TvIp 192.168.x.x -GrantOverlay -SetOwner
 
 .EXAMPLE
     # 跨品牌一条龙：装包 + 悬浮窗 + 看门狗（无障碍） + 汇报电视型号和系统桌面包名
-    powershell -ExecutionPolicy Bypass -File tools\tv-install.ps1 -TvIp 192.168.10.66 -GrantOverlay -EnableWatchdog
+    powershell -ExecutionPolicy Bypass -File tools\tv-install.ps1 -TvIp 192.168.x.x -GrantOverlay -EnableWatchdog
 #>
 [CmdletBinding()]
 param(
