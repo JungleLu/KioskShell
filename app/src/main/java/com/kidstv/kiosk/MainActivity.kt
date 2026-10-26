@@ -550,7 +550,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         val overlayWarn = if (Config.limitEnabled && !Settings.canDrawOverlays(this) && !Kiosk.isDeviceOwner(this))
-            "\n⚠️ 没给悬浮窗权限，到点盖不出锁屏页"
+            "\n⚠️ 悬浮窗权限丢了：用电脑 ADB 恢复（设置页授权会被系统回收）"
         else ""
 
         val targetDesc = when {
@@ -750,16 +750,44 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "已经授权了", Toast.LENGTH_SHORT).show()
             return
         }
+        val ip = localIp()
+        val cmd = if (ip != null)
+            "adb connect $ip:5555\nadb shell cmd appops set $packageName SYSTEM_ALERT_WINDOW allow"
+        else
+            "adb shell cmd appops set $packageName SYSTEM_ALERT_WINDOW allow"
         AlertDialog.Builder(this)
             .setTitle("悬浮窗权限")
             .setMessage(
-                "电视系统把这个权限收回去了（海信会这么干）。\n" +
-                    "到点弹出休息页、开机自启，都要这个权限。\n" +
-                    "在接下来的页面里找到「儿童桌面」，选「允许」。"
+                "VIDAA/海信系统会反复回收这个权限：\n" +
+                    "在电视设置页点「允许」，几分钟后它自己又关掉（实测）。\n\n" +
+                    "到点弹休息页、开机自启，都靠这个权限。\n\n" +
+                    "正确做法：用电脑 ADB 授权，系统不会回收：\n\n" +
+                    cmd +
+                    "\n\n电视设置页授权只能临时应急，会被再次回收。"
             )
-            .setPositiveButton("去开启") { _, _ -> openOverlaySettings() }
-            .setNegativeButton("取消", null)
+            .setPositiveButton("知道了", null)
+            .setNeutralButton("去设置页（不推荐）") { _, _ -> openOverlaySettings() }
             .show()
+    }
+
+    /** 取本机局域网 IP，拼 ADB 命令用。只读网卡信息，不需要额外权限。 */
+    private fun localIp(): String? {
+        return try {
+            var fallback: String? = null
+            for (ni in java.util.Collections.list(java.net.NetworkInterface.getNetworkInterfaces())) {
+                if (!ni.isUp || ni.isLoopback) continue
+                for (addr in java.util.Collections.list(ni.inetAddresses)) {
+                    if (addr is java.net.Inet4Address && !addr.isLoopbackAddress) {
+                        val ip = addr.hostAddress ?: continue
+                        if (ip.startsWith("192.168.") || ip.startsWith("10.")) return ip
+                        if (fallback == null) fallback = ip
+                    }
+                }
+            }
+            fallback
+        } catch (e: Exception) {
+            null
+        }
     }
 
     private fun openOverlaySettings() {
@@ -927,7 +955,7 @@ class MainActivity : AppCompatActivity() {
             append("① 锁定：")
             append(if (Config.locked) "开 ✅\n" else "关 ❌ 退出过，开机不自启\n")
             append("② 悬浮窗：")
-            append(if (overlay) "已给 ✅\n" else "没给 ❌ 后台拉界面靠它\n")
+            append(if (overlay) "已给 ✅\n" else "没给 ❌ 用电脑 ADB 恢复（设置页授权会被回收）\n")
             append("③ 开机广播：已听 ✅\n")
             append("④ 默认桌面：")
             append(if (homeLocked) "儿童桌面 ✅\n" else "「$launcherName」（看门狗兜底）\n")

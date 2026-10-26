@@ -134,7 +134,7 @@ class GuardService : Service() {
             try {
                 Toast.makeText(
                     applicationContext,
-                    "悬浮窗权限被系统收回了，回儿童桌面重新授予",
+                    "悬浮窗权限被系统收回，用电脑 ADB 恢复（家长菜单→悬浮窗权限）",
                     Toast.LENGTH_LONG
                 ).show()
             } catch (e: Exception) {
