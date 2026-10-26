@@ -16,7 +16,6 @@ import android.os.Looper
 import android.os.PowerManager
 import android.os.SystemClock
 import android.provider.Settings
-import android.widget.Toast
 import androidx.core.app.NotificationCompat
 
 /**
@@ -33,6 +32,17 @@ class GuardService : Service() {
         private const val RETRY_LOCK_MS = 8000L
         private const val NOTIFY_EVERY_TICKS = 5
         private const val OVERLAY_CHECK_MS = 30_000L
+
+        /** 悬浮窗丢失的提示最多一小时一次，别一秒一条地烦人 */
+        private const val OVERLAY_NOTICE_MS = 60 * 60 * 1000L
+
+        /**
+         * 本服务是否还活着。看门狗（无障碍服务）靠它判断要不要接管计时——
+         * 两个服务同时 tick 会把观看时长算成两倍。
+         */
+        @Volatile
+        var alive = false
+            private set
 
         fun start(ctx: Context) {
             val intent = Intent(ctx, GuardService::class.java)
@@ -73,6 +83,7 @@ class GuardService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        alive = true
         Timer.screenOn = isScreenOn()
         registerScreenReceiver()
     }
@@ -87,6 +98,7 @@ class GuardService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        alive = false
         handler.removeCallbacks(ticker)
         try {
             receiver?.let { unregisterReceiver(it) }
@@ -114,10 +126,12 @@ class GuardService : Service() {
     }
 
     /**
-     * 悬浮窗权限巡检：海信固件会无声收回这个权限（实测过），
-     * 丢了之后到点盖不出休息页、开机拉不起界面，而且不报错。
-     * 这里每 30 秒查一次，刚丢的那一刻记标记 + 弹 Toast，
-     * 家长一回桌面 MainActivity 看到标记就会弹授权引导。
+     * 悬浮窗权限巡检。
+     *
+     * 海信 VIDAA 会无声收回这个权限（实测 4~6 分钟一次，无日志）。
+     * **v1.27 起它已经不是必需品**：到点锁屏和开机拉起改走无障碍通道。
+     * 所以这里只负责记一笔状态给家长菜单看，不再弹 Toast 打扰人
+     * （以前权限一掉就弹一次，一晚上能弹十几次）。
      */
     private fun checkOverlayPermission() {
         if (!Config.kioskMode || !Config.limitEnabled) return
@@ -131,14 +145,6 @@ class GuardService : Service() {
         }
         if (!has && !Config.overlayLost) {
             Config.overlayLost = true
-            try {
-                Toast.makeText(
-                    applicationContext,
-                    "悬浮窗权限被系统收回，用电脑 ADB 恢复（家长菜单→悬浮窗权限）",
-                    Toast.LENGTH_LONG
-                ).show()
-            } catch (e: Exception) {
-            }
         } else if (has && Config.overlayLost) {
             Config.overlayLost = false
         }

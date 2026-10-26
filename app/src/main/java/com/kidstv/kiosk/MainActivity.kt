@@ -85,12 +85,10 @@ class MainActivity : AppCompatActivity() {
         refreshTarget()
         refreshTimeInfo()
 
-        // 悬浮窗权限被系统无声收回过（海信固件实测会这么干）：回桌面立刻弹引导，
-        // 不然到点盖不出休息页、开机拉不起界面，家长还不知道为什么
-        if (Config.overlayLost) {
-            Config.overlayLost = false
-            requestOverlayPermission()
-        }
+        // 悬浮窗权限被系统无声收回过（海信固件实测 4~6 分钟一次）。
+        // v1.27 起它不是必需品：到点锁屏和开机拉起都改走无障碍通道，
+        // 所以这里不再弹窗打断家长，只在家长菜单里给一行状态。
+        if (Config.overlayLost) Config.overlayLost = false
         refreshThemeBtn()
 
         // Device Owner 下每次回桌面都重申一遍：HOME 归属 + 白名单（有些固件会自己改回去）
@@ -524,7 +522,7 @@ class MainActivity : AppCompatActivity() {
             items.add("退出儿童桌面")
         }
         if (!Settings.canDrawOverlays(this)) {
-            items.add("悬浮窗权限")
+            items.add("悬浮窗权限（可选）")
         }
         items.add("开机自启检查")
         items.add("系统设置")
@@ -549,9 +547,10 @@ class MainActivity : AppCompatActivity() {
             "时长管控：关"
         }
 
-        val overlayWarn = if (Config.limitEnabled && !Settings.canDrawOverlays(this) && !Kiosk.isDeviceOwner(this))
-            "\n⚠️ 悬浮窗权限丢了：用电脑 ADB 恢复（设置页授权会被系统回收）"
-        else ""
+        val overlayWarn =
+            if (!Settings.canDrawOverlays(this) && !Kiosk.isDeviceOwner(this))
+                "\n悬浮窗：未授权（可选，不影响锁定和开机）"
+            else ""
 
         val targetDesc = when {
             Config.targets.isEmpty() -> "还没选（点下面「选择应用」）"
@@ -605,7 +604,7 @@ class MainActivity : AppCompatActivity() {
         when {
             item == "打开应用" -> launchTarget()
             item == "观看时长" -> openTimeSettings()
-            item == "悬浮窗权限" -> requestOverlayPermission()
+            item.startsWith("悬浮窗权限") -> requestOverlayPermission()
             item == "开机自启检查" -> showBootSelfCheck()
             item == "开启儿童桌面" -> enterKiosk()
             item.startsWith("临时回") -> passToStockLauncher()
@@ -718,20 +717,11 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** 无障碍服务有没有被打开 */
-    private fun watchServiceOn(): Boolean {
-        val enabled = try {
-            android.provider.Settings.Secure.getString(
-                contentResolver,
-                android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
-            )
-        } catch (e: Exception) {
-            null
-        }.orEmpty()
-        val full = "$packageName/${KioskWatchService::class.java.name}"
-        val short = "$packageName/.KioskWatchService"
-        return enabled.split(':').any { it.equals(full, true) || it.equals(short, true) }
-    }
+    /**
+     * 无障碍服务有没有被打开。
+     * 锁桌面、到点弹休息页、开机自启，三件事现在都靠它。
+     */
+    private fun watchServiceOn(): Boolean = Kiosk.isWatchServiceEnabled(this)
 
     // ---------- 观看时长 ----------
 
@@ -756,17 +746,18 @@ class MainActivity : AppCompatActivity() {
         else
             "adb shell cmd appops set $packageName SYSTEM_ALERT_WINDOW allow"
         AlertDialog.Builder(this)
-            .setTitle("悬浮窗权限")
+            .setTitle("悬浮窗权限（可选）")
             .setMessage(
-                "VIDAA/海信系统会反复回收这个权限：\n" +
-                    "在电视设置页点「允许」，几分钟后它自己又关掉（实测）。\n\n" +
-                    "到点弹休息页、开机自启，都靠这个权限。\n\n" +
-                    "正确做法：用电脑 ADB 授权，系统不会回收：\n\n" +
-                    cmd +
-                    "\n\n电视设置页授权只能临时应急，会被再次回收。"
+                "这个权限已经不再是必需品。\n" +
+                    "到点弹休息页、开机拉起界面，都改走无障碍通道了，不靠它。\n\n" +
+                    "给了的好处：锁屏页能盖得更快、更靠前。\n\n" +
+                    "海信/VIDAA 的毛病：在电视设置页点「允许」，\n" +
+                    "几分钟后系统会自己关掉（实测，不留任何日志）。\n" +
+                    "要稳就用电脑 ADB 授权一次：\n\n" +
+                    cmd
             )
             .setPositiveButton("知道了", null)
-            .setNeutralButton("去设置页（不推荐）") { _, _ -> openOverlaySettings() }
+            .setNeutralButton("去设置页（临时）") { _, _ -> openOverlaySettings() }
             .show()
     }
 
@@ -947,25 +938,32 @@ class MainActivity : AppCompatActivity() {
      * 开机自启失败从来不是"应用没做"，而是这四条里有一条没满足。
      */
     private fun showBootSelfCheck() {
+        val watch = watchServiceOn()
         val overlay = Settings.canDrawOverlays(this)
         val homeLocked = Kiosk.isHomeLocked(this)
         val launcherName = Kiosk.stockLauncherName(this)
 
         val lines = buildString {
             append("① 锁定：")
-            append(if (Config.locked) "开 ✅\n" else "关 ❌ 退出过，开机不自启\n")
-            append("② 悬浮窗：")
-            append(if (overlay) "已给 ✅\n" else "没给 ❌ 用电脑 ADB 恢复（设置页授权会被回收）\n")
+            append(if (Config.locked) "开 ✅\n" else "关 ❌ 退出过，开机不会自启\n")
+            append("② 无障碍（负责开机拉起）：")
+            append(if (watch) "已开 ✅\n" else "没开 ❌ 系统设置 → 无障碍 → 打开「儿童桌面」\n")
             append("③ 开机广播：已听 ✅\n")
             append("④ 默认桌面：")
-            append(if (homeLocked) "儿童桌面 ✅\n" else "「$launcherName」（看门狗兜底）\n")
+            append(if (homeLocked) "儿童桌面 ✅（最稳，系统自己启动它）\n" else "「$launcherName」（不用改，看门狗会拉回来）\n")
+            append("⑤ 悬浮窗：")
+            append(if (overlay) "已给（可选）\n" else "没给（可选，不影响开机）\n")
         }
 
         val tail =
-            "\n四项都正常，重启电视就会自动进儿童桌面。\n\n" +
-                "还不行？去电视的「自启动管理 / 省电优化」里把儿童桌面改成允许，" +
-                "海信、小米的固件默认会掐掉第三方应用。\n\n" +
-                "注意：安装后至少要手动打开过一次，否则收不到开机广播。"
+            "\n开机自启只看 ① 和 ②。无障碍服务是被系统绑定的，\n" +
+                "不受「后台不能启动界面」的限制，也不怕悬浮窗被收回。\n" +
+                "只要这两条满足，重启后几秒内就会进儿童桌面\n" +
+                "（原桌面可能闪一下，属正常）。\n\n" +
+                "还不行，按顺序查：\n" +
+                "1. 电视的「自启动管理 / 省电优化 / 电视管家」里把儿童桌面设为允许；\n" +
+                "2. 装完后至少手动打开过一次（否则收不到开机广播）；\n" +
+                "3. 刚更新过 APK：系统会关掉无障碍，需要重新打开一次。"
 
         AlertDialog.Builder(this)
             .setTitle("开机自启检查")

@@ -149,7 +149,27 @@ object Kiosk {
     }
 
     /**
-     * 是不是"真正的桌面"。
+     * 无障碍服务有没有被家长打开。
+     *
+     * 这是**唯一**能同时解决"锁桌面、到点休息、开机自启"的通道：
+     * 无障碍服务由系统绑定，属于 Android 10 后台启动限制的豁免情形，
+     * 不像悬浮窗权限那样会被海信固件周期性回收。
+     */
+    fun isWatchServiceEnabled(ctx: Context): Boolean {
+        val enabled = try {
+            Settings.Secure.getString(
+                ctx.contentResolver,
+                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+            )
+        } catch (e: Exception) {
+            null
+        }.orEmpty()
+        val full = "${ctx.packageName}/${KioskWatchService::class.java.name}"
+        val short = "${ctx.packageName}/.KioskWatchService"
+        return enabled.split(':').any { it.equals(full, true) || it.equals(short, true) }
+    }
+
+    /** 是不是"真正的桌面"。
      * 不能只看组件是否启用 —— 组件启用只代表"有资格当桌面"，
      * 还得问系统：按 HOME 最后会落到谁身上。
      */

@@ -20,9 +20,12 @@ import androidx.core.app.NotificationCompat
  * 2. **stopped 状态**：Android 3.1+，安装后从没被打开过的应用收不到开机广播。
  *    所以至少要在电视上手动打开过一次「儿童桌面」，之后每次开机都收得到。
  * 3. **Android 10+ 禁止后台启动 Activity**：从广播里直接 `startActivity` 会被静默拦截。
- *    唯一的豁免是「拥有 SYSTEM_ALERT_WINDOW 权限的应用」——而悬浮窗权限到点盖休息页
- *    本来就要给，所以正常情况下这条路是通的；万一没给，退到「全屏 Intent 通知」，
- *    那是系统明确留给后台应用的后门（打电话的场景就是它）。
+ *    豁免条件只有两条：有 SYSTEM_ALERT_WINDOW（海信会周期性回收，靠不住），
+ *    或者**拥有被系统绑定的服务**——无障碍服务就是。
+ *
+ * v1.27 的结论：**开机拉起交给看门狗（KioskWatchService），不在这里硬拉**。
+ * 这里只负责清「本次放行」、拉起计时服务，顺带在"有悬浮窗权限"时抢先拉一次省几秒；
+ * 没开无障碍才退回全屏 Intent 通知（系统留给后台应用的后门）。
  */
 class BootReceiver : BroadcastReceiver() {
 
@@ -46,6 +49,19 @@ class BootReceiver : BroadcastReceiver() {
         val launch = Intent(context, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
 
+        // 主路径：无障碍开着 = 看门狗活着，它开机后 3 分钟内会主动把界面拉起来。
+        // 有悬浮窗权限就顺手先拉一次（少等一两秒），没有也不影响。
+        if (Kiosk.isWatchServiceEnabled(context)) {
+            if (canStartActivityFromBackground(context)) {
+                try {
+                    context.startActivity(launch)
+                } catch (e: Exception) {
+                }
+            }
+            return
+        }
+
+        // 没开无障碍：只有悬浮窗权限能直接拉
         if (canStartActivityFromBackground(context)) {
             try {
                 context.startActivity(launch)
