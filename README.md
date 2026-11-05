@@ -9,7 +9,7 @@
 
 把安卓电视变成「只能看一个 App」的儿童模式：桌面上只有一个大图标，退出要家长密码，到点自动弹「休息一下」。**不刷机、不 root、不联云。**
 
-**[⬇ 下载最新版 APK](https://github.com/JungleLu/KioskShell/releases/latest)** · 约 3.2 MB · Android 5.0+ · 覆盖安装保留配置
+**[⬇ 下载最新版 APK](https://github.com/JungleLu/KioskShell/releases/latest)** · 约 3.5 MB · Android 5.0+ · 覆盖安装保留配置
 
 ![儿童桌面首页](docs/images/home.jpg)
 
