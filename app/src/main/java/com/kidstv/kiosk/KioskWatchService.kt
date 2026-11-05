@@ -1,9 +1,13 @@
 package com.kidstv.kiosk
 
 import android.accessibilityservice.AccessibilityService
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.os.SystemClock
 import android.provider.Settings
 import android.view.accessibility.AccessibilityEvent
@@ -48,6 +52,27 @@ class KioskWatchService : AccessibilityService() {
         /** 常态下"被拉到别处"后的最小重拉间隔 */
         private const val ENFORCE_COOLDOWN_MS = 1500L
 
+        /**
+         * 「前台是谁」这条记录的有效期。
+         *
+         * 超过这么久没收到窗口切换事件，就不能再拿旧记录当证据去拉人 ——
+         * 应用冷启动那 1~3 秒里，旧记录还停在启动前的桌面上，
+         * 拿它判断会把人从刚打开的应用里弹回去（v1.31 修的就是这个）。
+         */
+        private const val EVENT_FRESH_MS = 5000L
+
+        /**
+         * 主动探测「现在前台是谁」的间隔（v1.33）。
+         *
+         * 为什么不能只等事件：海信 VIDAA 按 HOME 切回系统桌面时**不发**
+         * `TYPE_WINDOW_STATE_CHANGED`。实测孩子按一下 HOME 就停在聚好看，
+         * 而 `lastFg` 还停在儿童桌面自己身上，巡检第一句 `if (lastFg == packageName) return`
+         * 直接退出 —— 锁形同虚设。
+         *
+         * 2 秒一次，只读 `rootInActiveWindow.packageName`，不遍历界面树。
+         */
+        private const val PROBE_INTERVAL_MS = 2000L
+
         /** 锁屏页最小重提间隔：孩子按 HOME/返回逃掉时把它再盖回去 */
         private const val LOCK_COOLDOWN_MS = 6000L
 
@@ -66,10 +91,18 @@ class KioskWatchService : AccessibilityService() {
 
     /** 最后一次见到的前台应用（自己 / systemui / 输入法都不算） */
     private var lastFg = ""
+
+    /** 上面那条记录是什么时候更新的。用来判断它还作不作数 */
+    private var lastEventAt = 0L
     private var lastEnforceAt = 0L
     private var lastLockAt = 0L
+    private var lastProbeAt = 0L
     private var bootTries = 0
     private var connectedAt = 0L
+
+    /** 屏幕亮着吗。待机时不去拉界面，也停掉计时 */
+    private var screenOn = true
+    private var screenReceiver: BroadcastReceiver? = null
 
     private val ticker = object : Runnable {
         override fun run() {
@@ -85,8 +118,12 @@ class KioskWatchService : AccessibilityService() {
         super.onServiceConnected()
         connected = true
         lastFg = ""
+        lastEventAt = 0L
         bootTries = 0
         connectedAt = SystemClock.elapsedRealtime()
+        screenOn = isScreenOn()
+        Timer.screenOn = screenOn
+        registerScreenReceiver()
         handler.removeCallbacks(ticker)
         handler.post(ticker)
     }
@@ -94,12 +131,22 @@ class KioskWatchService : AccessibilityService() {
     override fun onUnbind(intent: Intent?): Boolean {
         connected = false
         handler.removeCallbacks(ticker)
+        try {
+            screenReceiver?.let { unregisterReceiver(it) }
+        } catch (e: Exception) {
+        }
+        screenReceiver = null
         return super.onUnbind(intent)
     }
 
     override fun onDestroy() {
         connected = false
         handler.removeCallbacks(ticker)
+        try {
+            screenReceiver?.let { unregisterReceiver(it) }
+        } catch (e: Exception) {
+        }
+        screenReceiver = null
         super.onDestroy()
     }
 
@@ -115,6 +162,7 @@ class KioskWatchService : AccessibilityService() {
         if (isCurrentIme(pkg)) return
 
         lastFg = pkg
+        lastEventAt = SystemClock.elapsedRealtime()
         if (pkg == packageName) bootTries = 0
         enforce(pkg)
     }
@@ -123,7 +171,11 @@ class KioskWatchService : AccessibilityService() {
     private fun enforce(pkg: String) {
         if (!Config.kioskMode) return
         if (Config.passOnce) return                       // 家长按了「本次放行」
+        if (!screenOn) return                             // 待机中拉界面没意义
         if (SystemClock.elapsedRealtime() < Config.watchdogPauseUntil) return
+        // 刚启动过目标应用：这 6 秒内的事件（广告页、播放器内核、授权弹窗）一律不追究。
+        // 少了这句，从桌面点开应用、首帧还没出来就被判成"跑了"，弹回桌面（v1.31）
+        if (SystemClock.elapsedRealtime() < Kiosk.targetGraceUntil) return
         if (pkg == packageName) return                    // 自己的桌面/锁屏页
         if (pkg in Config.targets) return                 // 目标应用（可多选），放行
 
@@ -136,6 +188,14 @@ class KioskWatchService : AccessibilityService() {
     // ---------------- 每秒一拍 ----------------
 
     private fun onBeat() {
+        // 心跳：发现中间睡过一大觉就把「本次放行」作废。
+        // 这是 ProcId 判据的兜底 —— 万一待机时进程侥幸没被杀，靠 tick 空档也能认出来。
+        Config.heartbeat()
+
+        // 主动校正「前台是谁」：有的固件切回系统桌面不发窗口事件，光等事件会一直以为
+        // 还在自己桌面上，按 HOME 跑掉也拉不回来（v1.33）
+        probeForeground()
+
         // GuardService 被系统掐掉时由这里接管计时，否则"看了多久"永远不涨
         val tick = if (GuardService.alive) Timer.TickResult.NONE else Timer.tick()
 
@@ -144,10 +204,43 @@ class KioskWatchService : AccessibilityService() {
     }
 
     /**
+     * 直接问系统「现在前台是哪个应用」，不看事件。
+     *
+     * 只在 [PROBE_INTERVAL_MS] 跑一次；拿到包名就当一条新鲜事件处理，
+     * 这样 [watchBootAndEscape] 手里的 [lastFg] 永远是可信的。
+     *
+     * 读 `rootInActiveWindow` 需要 `canRetrieveWindowContent="true"`（见 accessibility_config.xml），
+     * 这里**只取 packageName**，不碰界面内容和文字。
+     */
+    private fun probeForeground() {
+        if (!Config.kioskMode) return
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastProbeAt < PROBE_INTERVAL_MS) return
+        lastProbeAt = now
+        val pkg = try {
+            rootInActiveWindow?.packageName?.toString().orEmpty()
+        } catch (e: Exception) {
+            ""
+        }
+        // 拿不到（视频全屏、SurfaceView 之类）就保持原记录，别瞎猜
+        if (pkg.isEmpty()) return
+        if (pkg in SYSTEM_UI_PKGS) return
+        if (isCurrentIme(pkg)) return
+        if (pkg == lastFg) return
+        lastFg = pkg
+        lastEventAt = now
+        enforce(pkg)
+    }
+
+    /**
      * 到点盖锁屏页。
      * 走无障碍通道 → 不需要悬浮窗权限，也不会被 Android 10 的后台启动限制拦住。
      */
     private fun lockIfTimeUp(tick: Timer.TickResult): Boolean {
+        // 临时放行期间不弹休息页/超额页：家长正在用，计时已由 Timer.shouldCount 停掉，
+        // 这里再挡一次，防止放行前遗留的 restUntil / dayBlocked 把页面弹出来。
+        if (Config.passOnce) return false
+        if (!screenOn) return false                       // 待机时不弹
         if (!Config.locked || !Config.limitEnabled) return false
         val resting = tick == Timer.TickResult.REST || Timer.restRemainingSeconds() > 0
         val dayOver = tick == Timer.TickResult.DAY_OVER || Config.dayBlocked
@@ -164,10 +257,15 @@ class KioskWatchService : AccessibilityService() {
      * 兜底巡检：
      * 1) 开机后 3 分钟内，可能一个窗口事件都没收到，这里主动拉；
      * 2) 常态下如果停在别处（事件丢了 / 被别的应用盖住），也拉回来。
+     *
+     * **只在"证据新鲜"时动手**（v1.31）：手里的 [lastFg] 来自上一个窗口事件，
+     * 应用冷启动那几秒它还是旧值，拿旧值判断就会把人从刚打开的应里弹回来。
      */
     private fun watchBootAndEscape() {
         if (!Config.kioskMode || Config.passOnce) return
+        if (!screenOn) return
         if (SystemClock.elapsedRealtime() < Config.watchdogPauseUntil) return
+        if (SystemClock.elapsedRealtime() < Kiosk.targetGraceUntil) return
         if (lastFg == packageName) return
         if (lastFg in Config.targets) return
 
@@ -176,17 +274,88 @@ class KioskWatchService : AccessibilityService() {
         // 这两种情况都可能一个窗口事件都没收到，事件驱动永远等不到，必须主动拉
         val booting = now < BOOT_WINDOW_MS ||
             (connectedAt > 0 && now - connectedAt < RECONNECT_WINDOW_MS)
-
-        val cooldown = if (lastFg.isEmpty() && booting) BOOT_RETRY_MS else ENFORCE_COOLDOWN_MS
-        if (now - lastEnforceAt < cooldown) return
+        val fresh = lastEventAt > 0 && now - lastEventAt < EVENT_FRESH_MS
 
         if (lastFg.isEmpty()) {
-            if (!booting) return                  // 无从判断，别乱拉
+            // 一次事件都没收到：只在开机/刚重连的窗口里盲拉，其余情况无从判断，别乱拉
+            if (!booting) return
             if (bootTries >= BOOT_MAX_TRIES) return
+            if (now - lastEnforceAt < BOOT_RETRY_MS) return
             bootTries++
+            lastEnforceAt = now
+            backToKiosk()
+            return
         }
+
+        // 有记录但过期了：状态很可能已经变了（应用正在启动 / 刚切换），不能据此拉人
+        if (!fresh && !booting) return
+
+        if (now - lastEnforceAt < ENFORCE_COOLDOWN_MS) return
         lastEnforceAt = now
         backToKiosk()
+    }
+
+    // ---------------- 息屏 / 亮屏 ----------------
+
+    /**
+     * 电视的「关机」多数是待机，不走开机广播、`boot_id` 也不变，
+     * 所以放行状态必须靠这里收尾，否则第二天开机还是原桌面（v1.31）。
+     */
+    private fun registerScreenReceiver() {
+        if (screenReceiver != null) return
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_SCREEN_ON)
+            addAction(Intent.ACTION_SCREEN_OFF)
+        }
+        val r = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                when (intent?.action) {
+                    Intent.ACTION_SCREEN_OFF -> onScreenOff()
+                    Intent.ACTION_SCREEN_ON -> onScreenOn()
+                }
+            }
+        }
+        screenReceiver = r
+        try {
+            registerReceiver(r, filter)
+        } catch (e: Exception) {
+            screenReceiver = null
+        }
+    }
+
+    private fun onScreenOff() {
+        screenOn = false
+        // 看门狗在接管计时时要靠这个停表，否则待机时间会被算成观看时间
+        Timer.screenOn = false
+        Config.noteScreenOff()
+    }
+
+    private fun onScreenOn() {
+        screenOn = true
+        Timer.screenOn = true
+        // 睡够 3 分钟：这一轮放行就地作废（家长昨晚用完电视了）
+        Config.noteScreenOn()
+
+        if (!Config.kioskMode || Config.passOnce) return
+        if (SystemClock.elapsedRealtime() < Config.watchdogPauseUntil) return
+        if (SystemClock.elapsedRealtime() < Kiosk.targetGraceUntil) return
+
+        // 唤醒后窗口没变过，不会来新的窗口事件，等事件驱动就永远等不到。
+        // 直接判一次：该进桌面就进。
+        lastFg = ""
+        lastEventAt = 0L
+        lastEnforceAt = 0L
+        bootTries = 0
+        backToKiosk()
+    }
+
+    private fun isScreenOn(): Boolean {
+        val power = getSystemService(Context.POWER_SERVICE) as? PowerManager ?: return true
+        return try {
+            power.isInteractive
+        } catch (e: Exception) {
+            true
+        }
     }
 
     // ---------------- 启动界面 ----------------

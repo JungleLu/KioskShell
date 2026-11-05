@@ -107,6 +107,10 @@ object Timer {
 
     fun shouldCount(): Boolean {
         if (!Config.locked || !Config.limitEnabled) return false
+        // 临时放行（家长回原桌面自己用）：整段暂停计时。
+        // 少了这一句，放行期间 GuardService / 看门狗照常 tick，单次时长一到
+        // 就会弹「休息一下」的倒计时 —— 家长想自己看会儿电视反而被拦，v1.30 修。
+        if (Config.passOnce) return false
         if (!watching || !screenOn) return false
         if (Config.dayBlocked) return false
         if (restRemainingSeconds() > 0) return false

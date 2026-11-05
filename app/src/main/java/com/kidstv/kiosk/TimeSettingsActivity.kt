@@ -132,7 +132,9 @@ class TimeSettingsActivity : AppCompatActivity() {
         b.rowAuto.rowLabel.text = getString(R.string.row_auto)
         b.rowAuto.rowValue.text =
             getString(if (Config.autoLaunch) R.string.value_on else R.string.value_off)
-        b.rowAuto.rowHint.text = "◀ ▶"
+        // 多选时自动进入不生效：没有"该进哪个"的答案，所以直接把原因写在行尾
+        b.rowAuto.rowHint.text =
+            if (Config.targets.size > 1) getString(R.string.row_auto_multi) else "◀ ▶"
 
         b.rowVoice.rowLabel.text = getString(R.string.row_voice)
         b.rowVoice.rowValue.text =

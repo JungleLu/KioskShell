@@ -152,6 +152,9 @@ class GuardService : Service() {
 
     /** 孩子按 HOME 逃掉锁屏、又从最近任务钻回视频时，把锁屏重新盖上去 */
     private fun reassertLock() {
+        // 临时放行期间别再盖锁屏（家长在用自己的电视）
+        if (Config.passOnce) return
+        if (!Timer.screenOn) return                  // 待机时不弹
         if (!Timer.watching) return
         val now = System.currentTimeMillis()
         if (now - lastLockAt < RETRY_LOCK_MS) return
@@ -214,6 +217,7 @@ class GuardService : Service() {
 
         val text = when {
             !Config.limitEnabled -> "时长管控已关闭"
+            Config.passOnce -> "已临时放行 · 暂停计时"
             Config.dayBlocked -> "今天的时间已用完"
             Timer.restRemainingSeconds() > 0 -> "休息中，还剩 ${formatMinutes(Timer.restRemainingSeconds())}"
             else -> {
@@ -283,8 +287,19 @@ class GuardService : Service() {
         val r = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 when (intent?.action) {
-                    Intent.ACTION_SCREEN_OFF -> Timer.screenOn = false
-                    Intent.ACTION_SCREEN_ON, Intent.ACTION_USER_PRESENT -> Timer.screenOn = true
+                    Intent.ACTION_SCREEN_OFF -> {
+                        Timer.screenOn = false
+                        // 和无障碍服务里同一套判断：睡了 3 分钟以上，这次放行就结束。
+                        // 两个服务都记一次是故意的 —— 谁活着谁兜底，幂等。
+                        Config.noteScreenOff()
+                    }
+                    Intent.ACTION_SCREEN_ON, Intent.ACTION_USER_PRESENT -> {
+                        Timer.screenOn = true
+                        if (Config.noteScreenOn()) {
+                            // 放行作废了，通知栏文案跟着变
+                            updateNotification()
+                        }
+                    }
                 }
             }
         }

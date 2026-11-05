@@ -1,12 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   看门狗用的无障碍配置。
-  只收「窗口切换」一种事件、不需要读屏内容（canRetrieveWindowContent=false），
-  权限最小化：能拿到"现在前台是哪个应用"就够，不碰界面文字。
+  收「窗口切换」事件；canRetrieveWindowContent 打开只是为了**主动问一句"现在前台是谁"**。
+
+  为什么必须开（v1.33）：部分固件（海信 VIDAA 实测）按 HOME 切回系统桌面时
+  **不发 `TYPE_WINDOW_STATE_CHANGED`**，于是事件驱动拿不到新前台，`lastFg` 一直停在
+  儿童桌面自己身上，巡检第一句就 return —— 孩子按 HOME 就跑掉了，锁形同虚设。
+
+  开了这个开关之后只做一件事：读 `rootInActiveWindow.packageName`，**不遍历界面树、
+  不读任何文字**。权限描述里系统会显示"可读取屏幕内容"，实际用途只有取包名。
 -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
     android:accessibilityEventTypes="typeWindowStateChanged"
     android:accessibilityFeedbackType="feedbackGeneric"
     android:notificationTimeout="50"
-    android:canRetrieveWindowContent="false"
+    android:canRetrieveWindowContent="true"
     android:description="@string/acc_desc" />

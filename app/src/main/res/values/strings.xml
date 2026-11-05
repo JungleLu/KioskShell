@@ -17,7 +17,8 @@
     <string name="row_rest">每次休息</string>
     <string name="row_daily">每天总共</string>
     <string name="row_gate">家长验证</string>
-    <string name="row_auto">自动进应用</string>
+    <string name="row_auto">开机自动进应用</string>
+    <string name="row_auto_multi">选 1 个才生效</string>
     <string name="acc_desc">只检测当前前台应用，孩子跳到别的应用时把儿童桌面拉回来。不读屏幕内容，不收集数据。</string>
     <string name="row_voice">休息语音</string>
     <string name="row_preview">试听语音</string>

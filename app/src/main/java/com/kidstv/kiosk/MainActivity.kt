@@ -38,7 +38,8 @@ class MainActivity : AppCompatActivity() {
 
     private val autoLaunchRunnable = Runnable {
         if (pinDialogShowing || suppressAuto) return@Runnable
-        if (!Config.autoLaunch) return@Runnable
+        // 只在开机窗口内自动进一次；按 HOME 回来时这里已经不成立，桌面就停住不动
+        if (!Config.autoLaunchDue()) return@Runnable
         if (Timer.restRemainingSeconds() > 0 || Config.dayBlocked) return@Runnable
         if (!anyTargetInstalled()) return@Runnable
         launchTarget()
@@ -114,20 +115,25 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onStop() {
-        // 离开桌面（去目标应用 / 去系统设置）就重新武装，回来时还能自动跳
+        // 离开桌面（去目标应用 / 去系统设置）就重新武装。
+        // 是否真的会跳，由 Config.autoLaunchDue() 决定：开机窗口外、或本轮已经进过，就不会跳。
         suppressAuto = false
         super.onStop()
     }
 
     /**
-     * 选好目标应用后，桌面只做中转：停留几秒就自动进应用（默认关）。
+     * 开机后自动进入目标应用（默认关）。
      *
-     * 为什么要留这几秒：家长进家长菜单要长按 2 秒，如果桌面一到就跳走，
-     * 家长永远没有机会按。孩子按 OK 会立刻进（点应用卡片），不用等。
+     * 只在这一轮开机的头几分钟、且还没自动进过的时候生效（见 [Config.autoLaunchDue]）。
+     * 以前是"只要桌面回到前台就排队跳"，结果孩子按 HOME 回桌面，
+     * 4 秒后又被送进播放器 —— HOME 键等于失效。现在回桌面就停在桌面。
+     *
+     * 为什么要留几秒：家长进家长菜单要长按 2 秒，桌面一到就跳走就没机会按。
+     * 孩子按 OK 会立刻进（点应用卡片），不用等。
      */
     private fun scheduleAutoLaunch() {
         handler.removeCallbacks(autoLaunchRunnable)
-        if (!Config.autoLaunch || suppressAuto) return
+        if (!Config.autoLaunchDue() || suppressAuto) return
         if (!anyTargetInstalled()) return
         handler.postDelayed(autoLaunchRunnable, autoLaunchDelay)
     }
@@ -140,8 +146,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         // 家长按一下遥控器（方向键/菜单键等）就取消这次自动跳转，慢慢长按即可。
-        // 但不能把 HOME / 返回 / 音量 / OK 算进去 —— 按 HOME 回桌面后要能继续自动进应用，
-        // 否则「回家 → 4 秒又进去」这个环就断了。
+        // 但 HOME / 返回 / 音量 / OK 不算：这些是孩子正常操作，不该被当成家长介入。
         if (!isNonCancelKey(keyCode)) {
             cancelAutoLaunch()
         }
@@ -393,7 +398,7 @@ class MainActivity : AppCompatActivity() {
     private fun statusText(): String {
         val base = when {
             Config.kioskMode && Config.passOnce ->
-                "放行中 · 重启后恢复锁定"
+                "放行中 · 关机/息屏后恢复锁定"
             Config.kioskMode && !watchServiceOn() ->
                 "看门狗没开 · 设置→无障碍→儿童桌面"
             Config.kioskMode -> "已锁定 · 长按菜单键 2 秒退出"
@@ -402,7 +407,7 @@ class MainActivity : AppCompatActivity() {
             Kiosk.isDeviceOwner(this) -> "强锁中 · 长按菜单键 2 秒退出"
             else -> "未锁定 · 长按菜单键 2 秒设置"
         }
-        return if (Config.autoLaunch && anyTargetInstalled()) {
+        return if (Config.autoLaunchDue() && anyTargetInstalled()) {
             "$base · 按任意键取消自动进入"
         } else {
             base
@@ -442,6 +447,9 @@ class MainActivity : AppCompatActivity() {
         }
         if (!Kiosk.launchTarget(this)) {
             Toast.makeText(this, R.string.not_installed, Toast.LENGTH_LONG).show()
+        } else {
+            // 这一轮开机已经自动进过（或孩子自己点进过），之后回桌面就不再自动跳
+            Config.markAutoLaunched()
         }
     }
 
@@ -500,7 +508,7 @@ class MainActivity : AppCompatActivity() {
         suppressAuto = true
         handler.removeCallbacks(autoLaunchRunnable)
         val mode = when {
-            Config.kioskMode && Config.passOnce -> "已锁定 · 放行中（重启恢复）"
+            Config.kioskMode && Config.passOnce -> "已锁定 · 放行中（关机恢复）"
             Config.kioskMode && watchServiceOn() -> "已锁定"
             Config.kioskMode -> "未生效 · 缺无障碍权限"
             Kiosk.isDeviceOwner(this) -> "强锁中"
@@ -509,7 +517,9 @@ class MainActivity : AppCompatActivity() {
         }
 
         val items = mutableListOf<String>()
-        items.add("打开应用")
+        // 只选了一个应用时，这里给家长一个"直接进去"的快捷方式；
+        // 选了多个就没有"那一个"，桌面上的卡片随便点，不必在这儿猜
+        if (Config.targets.size == 1) items.add("打开应用")
         items.add("观看时长")
         // 三个状态：没锁 → 开启；锁着 → 本次放行 / 彻底退出
         // （「结束放行」不用单独做按钮：重新打开儿童桌面就会自动结束）
@@ -701,7 +711,7 @@ class MainActivity : AppCompatActivity() {
         Config.passOnce = true
         Toast.makeText(
             this,
-            "已回原桌面，重启或重开儿童桌面后恢复锁定",
+            "已回原桌面；重启、关机或息屏超 3 分钟后恢复锁定",
             Toast.LENGTH_LONG
         ).show()
         // 关键：这里本应用仍是默认桌面，隐式 HOME 会解析回自己（"点了没反应"）。

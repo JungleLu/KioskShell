@@ -22,6 +22,26 @@ object Kiosk {
 
     const val ALIAS = "com.kidstv.kiosk.HomeAlias"
 
+    /**
+     * 刚启动目标应用后的保护期（`elapsedRealtime` 毫秒），这段时间看门狗不拉人。
+     *
+     * 为什么需要：应用冷启动到画出第一帧要 1~3 秒。这期间看门狗手里记的"前台是谁"
+     * 还是启动前的那个（通常是系统桌面/聚好看），会被判成"孩子跑到别处去了"，
+     * 于是刚进入应用两秒就被弹回儿童桌面。实测连弹三次就是这么来的（v1.31）。
+     *
+     * 只在内存里，不落盘 —— 进程没了就不需要保护了。
+     */
+    @Volatile
+    var targetGraceUntil = 0L
+        private set
+
+    /** 6 秒够慢的电视把首帧画出来；再长就成逃跑窗口了 */
+    private const val TARGET_GRACE_MS = 6000L
+
+    private fun markTargetLaunched() {
+        targetGraceUntil = android.os.SystemClock.elapsedRealtime() + TARGET_GRACE_MS
+    }
+
     private fun dpm(ctx: Context): DevicePolicyManager? =
         ctx.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager
 
@@ -122,6 +142,7 @@ object Kiosk {
             if (launch != null) {
                 launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 ctx.startActivity(launch)
+                markTargetLaunched()
                 return true
             }
         } catch (e: Exception) {
@@ -141,6 +162,7 @@ object Kiosk {
                     .setPackage(target)
                     .addFlags(flags)
                 ctx.startActivity(intent)
+                markTargetLaunched()
                 return true
             } catch (e: Exception) {
                 // 试下一个 category

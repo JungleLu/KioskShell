@@ -4,10 +4,47 @@ import android.os.SystemClock
 
 object Config {
 
-    /** 「本次放行」的三个键：值本身 + 写入时刻的 uptime + 当时的 boot_id，后两个用来判断重启 */
+    /** 「本次放行」的四个键：值本身 + 写入时刻的 uptime + 当时的 boot_id + 当时的进程代次 */
     private const val KEY_PASS_ONCE = "pass_once"
     private const val KEY_PASS_ONCE_AT = "pass_once_at"
     private const val KEY_PASS_ONCE_BOOT = "pass_once_boot"
+    private const val KEY_PASS_ONCE_PROC = "pass_once_proc"
+
+    /** 上次息屏的墙钟时刻。用来判断"这次黑屏睡了多久" */
+    private const val KEY_SCREEN_OFF_AT = "screen_off_at"
+
+    /** 看门狗心跳：最后一次"我还活着"的墙钟时刻，用来发现中间有没有睡过一大觉 */
+    private const val KEY_HEARTBEAT = "heartbeat_at"
+
+    /**
+     * 息屏/待机超过这么久，就认为「这一次放行结束了」。
+     *
+     * 为什么需要：电视上的「关机」绝大多数是待机（suspend），不是冷启动 ——
+     * `boot_id` 不变，于是"换了一次开机才作废"这条判断完全覆盖不到，
+     * 放行标记会一直挂着。家长睡前点了「临时回原桌面」，第二天孩子开机，居然还是原桌面。
+     *
+     * 判据只能用墙钟（`currentTimeMillis()`）：`elapsedRealtime()` 是 `CLOCK_BOOTTIME`，
+     * **含**休眠时间，拿它算"睡了多久"永远算不出来。
+     *
+     * 之所以不直接在息屏广播里记时刻：系统可能先把进程杀掉再发广播（实测过一次），
+     * 记录动作没有机会执行。所以这里用"心跳断了多久"来间接判断。
+     *
+     * 3 分钟是为了放过"换台时闪一下黑屏"这种短息屏。
+     */
+    private const val PASS_SLEEP_MS = 3 * 60 * 1000L
+
+    /** 「这一轮开机已经自动进过应用」记在哪个 boot_id 上 */
+    private const val KEY_AUTO_LAUNCH_BOOT = "auto_launch_boot"
+
+    /**
+     * 「开机自动进应用」只在开机后的这段时间内有效。
+     *
+     * 为什么要有窗口：以前只要桌面回到前台就排队自动跳，孩子按 HOME 想回桌面，
+     * 4 秒后又被拽回播放器，等于 HOME 键白按。现在只有开机那一轮会自动进一次。
+     * 5 分钟足够覆盖「开机 → 看门狗拉起桌面 → 自动进应用」这条链，
+     * 又不会被「午休醒来」这类场景蹭到。
+     */
+    private const val AUTO_LAUNCH_WINDOW_MS = 5 * 60 * 1000L
 
     /**
      * 要锁定的目标应用，**可多选**。空集合 = 家长还没选，或者主动选了「不锁定任何应用」。
@@ -38,7 +75,10 @@ object Config {
         setTargets(cur)
     }
 
-    /** 第一个目标应用：自动进入、菜单「打开应用」用它 */
+    /**
+     * 目标应用里的第一个。**只在单选场景下有意义**（自动进入、菜单「打开应用」）。
+     * 多选时这个值取决于 HashSet 的迭代顺序，别拿它当"家长选的那个"。
+     */
     val primaryTarget: String
         get() = targets.firstOrNull { it.isNotBlank() } ?: ""
 
@@ -191,15 +231,48 @@ object Config {
         }
 
     /**
-     * 桌面只做中转：选好应用后停留几秒自动进去。
+     * 开机后自动进入目标应用（省得孩子每次再点一下）。
      * **默认关** —— 桌面停住不动、等孩子自己点，比"到点就跳"更好预期。
      * 想要自动进入的，在 观看时长设置 里打开。
+     *
+     * 注意：只在**开机窗口内**生效一次，见 [autoLaunchDue]。见下一条说明。
      */
     var autoLaunch: Boolean
         get() = App.prefs.getBoolean("auto_launch", false)
         set(value) {
             App.prefs.edit().putBoolean("auto_launch", value).apply()
         }
+
+    /**
+     * 现在该不该自动进入应用。
+     *
+     * 三个条件同时成立才算：
+     * ① 家长打开了「开机自动进应用」；
+     * ② **只选了一个应用**（见下）；
+     * ③ 开机还没超过 [AUTO_LAUNCH_WINDOW_MS]，且这一轮开机**还没自动进过**。
+     *
+     * 为什么"只选一个"才算：多选时根本没有"该进哪个"的答案。
+     * `targets` 是 SharedPreferences 的 StringSet，底层是 HashSet，
+     * 迭代顺序跟家长勾选的先后无关 —— 以前多选就是"开机进哪个看运气"。
+     * 与其猜，不如停在桌面让孩子自己点卡片（卡片本来就支持多选）。
+     *
+     * 为什么不"只要回到桌面就跳"：孩子按 HOME 就是想回桌面，
+     * 以前被看门狗拉回来之后 4 秒又被送进播放器，等于 HOME 键白按。
+     * 现在开机那一轮照旧自动进应用，之后回桌面就老实停在桌面。
+     */
+    fun autoLaunchDue(): Boolean {
+        if (!autoLaunch) return false
+        if (targets.size != 1) return false
+        // elapsedRealtime 含休眠时间，睡过一夜就自然超出窗口，不会第二天唤醒又跳
+        if (SystemClock.elapsedRealtime() > AUTO_LAUNCH_WINDOW_MS) return false
+        return App.prefs.getString(KEY_AUTO_LAUNCH_BOOT, "").orEmpty() != BootId.current
+    }
+
+    /** 记下"这一轮开机已经自动进过了"，之后回桌面不再跳 */
+    fun markAutoLaunched() {
+        // commit：这个标记丢了就意味着"按 HOME 还会被弹进应用"，宁可贵一点也要立刻落盘
+        App.prefs.edit().putString(KEY_AUTO_LAUNCH_BOOT, BootId.current).commit()
+    }
 
     /**
      * 看门狗模式：无障碍服务盯着前台，孩子跑到别的应用就立刻拉回儿童桌面。
@@ -238,12 +311,37 @@ object Config {
         get() {
             val sp = App.prefs
             if (!sp.getBoolean(KEY_PASS_ONCE, false)) return false
+
+            // 三条判据彼此独立，任一命中就作废。注意**不能像旧版那样"没重启就直接 return true"**，
+            // 否则走不到进程代次那条 —— 而待机场景下 boot_id 恰恰不变（v1.32 的坑）。
+
+            // ① 换过一次开机
             // at == 0 说明是旧版本写下的（那时还没有这两个键），无从判断，直接作废
-            if (!BootId.sinceReboot(sp.getLong(KEY_PASS_ONCE_AT, 0L), sp.getString(KEY_PASS_ONCE_BOOT, "").orEmpty())) {
-                return true
+            val rebooted = BootId.sinceReboot(
+                sp.getLong(KEY_PASS_ONCE_AT, 0L),
+                sp.getString(KEY_PASS_ONCE_BOOT, "").orEmpty()
+            )
+
+            // ② 换过一代进程（v1.32）
+            // 待机时系统会在息屏广播之前就把进程杀掉，"记下息屏时刻"那套代码根本没机会执行；
+            // 进程能换一代，说明中间一定经历过待机或重启 —— 这是最可靠的判据。
+            // 家长只是换台闪黑时进程不会死，所以不会误清。
+            // 空值 = 旧版本写的，同样按换过处理。
+            val recordedProc = sp.getString(KEY_PASS_ONCE_PROC, "").orEmpty()
+            val procChanged = recordedProc.isEmpty() || recordedProc != ProcId.current
+
+            // ③ 进程侥幸没死，但黑屏睡过头
+            val slept = sp.getLong(KEY_SCREEN_OFF_AT, 0L)
+                .let { it > 0L && System.currentTimeMillis() - it >= PASS_SLEEP_MS }
+
+            if (rebooted || procChanged || slept) {
+                sp.edit()
+                    .putBoolean(KEY_PASS_ONCE, false)
+                    .remove(KEY_SCREEN_OFF_AT)
+                    .commit()
+                return false
             }
-            sp.edit().putBoolean(KEY_PASS_ONCE, false).commit()
-            return false
+            return true
         }
         set(value) {
             // 用 commit 而不是 apply：这个值决定"重启后锁不锁"，丢了就要等家长手动打开才恢复
@@ -251,8 +349,58 @@ object Config {
                 .putBoolean(KEY_PASS_ONCE, value)
                 .putLong(KEY_PASS_ONCE_AT, SystemClock.elapsedRealtime())
                 .putString(KEY_PASS_ONCE_BOOT, BootId.current)
+                .putString(KEY_PASS_ONCE_PROC, ProcId.current)
+                // 清掉上一轮的息屏时刻：否则"上次睡了 10 小时"的记录会立刻把刚开的放行作废
+                .remove(KEY_SCREEN_OFF_AT)
                 .commit()
         }
+
+    /**
+     * 看门狗心跳。每个 tick 调一次，返回 true 表示「中间睡过一大觉，放行已作废」。
+     *
+     * 它补的是第 ② 条判据的漏洞：万一待机时进程侥幸没被杀，`ProcId` 判不出来，
+     * 但 handler 停下来这么久本身就是证据 —— 正常运行时每 1000ms 必有一次 tick。
+     *
+     * 基线每 60 秒才刷新一次盘（够用且省 flash）：睡 3 分钟以上，醒来第一次 tick
+     * 算出的空档必然超过 [PASS_SLEEP_MS]。
+     */
+    fun heartbeat(): Boolean {
+        val sp = App.prefs
+        val now = System.currentTimeMillis()
+        val last = sp.getLong(KEY_HEARTBEAT, 0L)
+        if (last > 0L && now - last >= PASS_SLEEP_MS) {
+            sp.edit().remove(KEY_HEARTBEAT).commit()
+            if (!sp.getBoolean(KEY_PASS_ONCE, false)) return false
+            passOnce = false
+            return true
+        }
+        if (last <= 0L || now - last >= 60_000L) {
+            sp.edit().putLong(KEY_HEARTBEAT, now).apply()
+        }
+        return false
+    }
+
+    /** 记下息屏时刻。广播里调用，必须同步落盘（进程可能在休眠中被回收） */
+    fun noteScreenOff() {
+        App.prefs.edit().putLong(KEY_SCREEN_OFF_AT, System.currentTimeMillis()).commit()
+    }
+
+    /**
+     * 亮屏调用。返回 true 表示这次放行被"睡过头"作废了。
+     *
+     * 幂等：先算先清，第二个调用方读到的是已清空，不会重复处理。
+     */
+    fun noteScreenOn(): Boolean {
+        val sp = App.prefs
+        val at = sp.getLong(KEY_SCREEN_OFF_AT, 0L)
+        if (at <= 0L) return false
+        sp.edit().remove(KEY_SCREEN_OFF_AT).commit()
+        // 墙钟差；改系统时间会让判断失准，但那是家长自己作弊，不防
+        if (System.currentTimeMillis() - at < PASS_SLEEP_MS) return false
+        if (!sp.getBoolean(KEY_PASS_ONCE, false)) return false
+        passOnce = false
+        return true
+    }
 
     /**
      * 彻底锁死：Device Owner 下进入 Lock Task，HOME 键和最近任务直接失效。
