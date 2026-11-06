@@ -8,6 +8,8 @@ description: 把 Android TV / 电视盒子变成「只能看一个 App」的儿�
 仓库里已经有一个跨平台命令行工具 `tools/kiosk.py`（Windows / macOS / Linux 通用）。
 **你的工作就是按顺序跑它，每一步都验证，别跳步，别自己另发明命令。**
 
+要改这个仓库的代码，先把根目录的 [`AGENTS.md`](AGENTS.md) 读一遍：**功能必须跨品牌通用，不许写死某台电视的包名 / 型号 / 厂商属性**。
+
 命令里 `python3` 在 Windows 上换成 `python`。下面统一写 `python3`。
 
 **`<电视IP>` 是占位符，没有任何默认值。** 必须替换成用户电视的真实局域网 IP，
