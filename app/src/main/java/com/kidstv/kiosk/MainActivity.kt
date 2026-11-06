@@ -415,7 +415,9 @@ class MainActivity : AppCompatActivity() {
             Config.kioskMode && Config.passOnce ->
                 "放行中 · 关机/息屏后恢复锁定"
             Config.kioskMode && !watchServiceOn() ->
-                "看门狗没开 · 设置→无障碍→儿童桌面"
+                // 以前这里教家长去「设置→无障碍」翻三层。现在家长菜单里有直达项了，
+                // 屏幕上就只说"点哪"，让人照着做一步就能修好
+                "看门狗没开 · 点左下角「家长」修复"
             Config.kioskMode -> "已锁定 · 点左下角「家长」退出"
             Kiosk.isDeviceOwner(this) && !Config.policyOk ->
                 "强锁没设置成功 · 点左下角「家长」看看"
@@ -546,6 +548,13 @@ class MainActivity : AppCompatActivity() {
             items.add("临时回原桌面")
             items.add("退出儿童桌面")
         }
+        // 无障碍权限掉了之后，菜单里必须留一条能自己走回去的路。
+        //
+        // 以前是空白：唯一会跳无障碍设置的是 enterKiosk()，而它只挂在「开启儿童桌面」
+        // 上，那一项在已锁定状态下根本不显示 —— 于是一旦权限被系统解绑，入口就从菜单里
+        // 彻底消失，家长只能凭记忆去系统设置里翻三层（v1.37 装机踩到）。
+        // 权限被解绑不是意外：每次覆盖安装 APK，Android 都会重新绑定无障碍服务。
+        if (Config.kioskMode && !watchServiceOn()) items.add("打开无障碍权限")
         if (!Settings.canDrawOverlays(this)) {
             items.add("悬浮窗权限（可选）")
         }
@@ -642,6 +651,7 @@ class MainActivity : AppCompatActivity() {
             }
             item == "退出儿童桌面" -> exitKiosk()
             item == "按键诊断" -> openKeyDiag()
+            item == "打开无障碍权限" -> openAccessibilitySettings()
             item == "系统设置" -> {
                 // 家长要进系统设置，先把看门狗停 10 分钟，否则一秒就被弹回来
                 Config.watchdogPauseUntil = SystemClock.elapsedRealtime() + WATCH_PAUSE_MS
@@ -692,16 +702,26 @@ class MainActivity : AppCompatActivity() {
                     "接下来跳到系统设置，打开「儿童桌面」即可。\n" +
                     "（10 分钟内不会把你弹回来）"
             )
-            .setPositiveButton("去打开") { _, _ ->
-                Config.watchdogPauseUntil = SystemClock.elapsedRealtime() + WATCH_PAUSE_MS
-                try {
-                    startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS))
-                } catch (e: Exception) {
-                    Toast.makeText(this, "打不开无障碍设置，请手动进系统设置", Toast.LENGTH_LONG).show()
-                }
-            }
+            .setPositiveButton("去打开") { _, _ -> openAccessibilitySettings() }
             .setNegativeButton("稍后", null)
             .show()
+    }
+
+    /**
+     * 跳到系统无障碍设置，打开「儿童桌面」。
+     *
+     * 必须先把看门狗暂停：在设置页停留超过一秒就会被拉回桌面，家长根本没机会点到开关。
+     *
+     * 这里的状态其实是矛盾的——权限已经掉了，看门狗本来就没在跑。仍然设一次暂停，
+     * 是因为家长点完开关、服务刚被系统绑上，看门狗会立刻活过来，正好把他从设置页弹走。
+     */
+    private fun openAccessibilitySettings() {
+        Config.watchdogPauseUntil = SystemClock.elapsedRealtime() + WATCH_PAUSE_MS
+        try {
+            startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        } catch (e: Exception) {
+            Toast.makeText(this, "打不开无障碍设置，请手动进系统设置", Toast.LENGTH_LONG).show()
+        }
     }
 
     /** 退出儿童桌面：关看门狗 + 撤掉自己的桌面身份，电视原样回来 */
