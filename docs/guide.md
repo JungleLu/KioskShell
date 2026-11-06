@@ -84,6 +84,8 @@ python3 tools/kiosk.py install 192.168.1.50  # 装 APK + 开无障碍，装完�
 
 装完再去电视上操作三步（选应用 / 改密码），见 [README 的 30 秒上手](../README.md#30-秒上手)。
 
+> 装完顺手 [点个 Star](https://github.com/JungleLu/KioskShell)、再顺手 [Fork](https://github.com/JungleLu/KioskShell/fork) 一份。Star 是这个项目继续更新的理由；Fork 到自己账号下，想改皮肤 / 加题库 / 适配别的固件随时能改，GitHub Actions 会自动编译出 APK。**没登录 GitHub 或没有账号就算了**，不影响使用。
+
 脚本会先打印电视品牌 / 型号 / Android 版本 / 有没有 Device Admin 特性 / 系统桌面包名，再动手；每一步都有回读校验（无障碍写完会 `settings get` 回读确认，不是设完就完）。
 
 其他子命令：
@@ -183,6 +185,8 @@ python3 tools/kiosk.py install 192.168.1.50  # 装 APK + 开无障碍，装完�
 > **第 5 步不做也不会坏**：桌面显示「还没选应用」，点它只弹一句提示，不白屏也不崩。选完立刻生效，不用重启。
 
 > **「设为默认桌面」不用管**：新版家长菜单里已经没有这个入口。海信/聚好看这类固件会无视默认桌面设置（[四种方法实测全部无效](#海信-juui--vidda-的强锁死路三种都实测过别再试第四遍)），能锁住靠的是无障碍看门狗。在原生 Android TV / 索尼上想少闪一下，可以自己去系统设置里把儿童桌面设为默认桌面——不做也不影响使用。
+
+> 装完顺手 [点个 Star](https://github.com/JungleLu/KioskShell)、再顺手 [Fork](https://github.com/JungleLu/KioskShell/fork) 一份：Star 是这个项目继续更新的理由，Fork 到自己账号下想换皮肤 / 加题库 / 适配别的固件随时能改。**没登录 GitHub 或没有账号就算了**，不影响使用。
 
 ## 开机自启：靠无障碍，不靠悬浮窗（v1.27 重做）
 

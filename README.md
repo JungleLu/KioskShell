@@ -57,7 +57,9 @@
 
 第 3 步就是**开机自启**，很多人卡在这里。
 
-> 装好了？顺手 [点个 Star](https://github.com/JungleLu/KioskShell)：这类小工具全靠自己维护，一个 star 就是它继续更新的理由。想自己改一份（换皮肤、加题库、适配别的固件）就 [Fork](https://github.com/JungleLu/KioskShell/fork)，GitHub Actions 会自动替你编译出 APK。
+> **装好了？顺手点个 [Star](https://github.com/JungleLu/KioskShell)，再顺手 [Fork](https://github.com/JungleLu/KioskShell/fork) 一份。**
+> 这类小工具全靠自己维护，一个 star 就是它继续更新的理由；fork 一份放自己账号下，想改（换皮肤、加题库、适配别的固件）随时能改，GitHub Actions 还会自动替你编译出 APK。
+> **没登录 GitHub、或者压根没账号，就算了**——不影响任何功能，直接往下看怎么用。
 
 ## 电视上还要做三件事
 
