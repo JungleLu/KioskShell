@@ -2,14 +2,19 @@ package com.kidstv.kiosk
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.TypedValue
 import android.view.KeyEvent
+import android.view.View
 import android.view.WindowManager
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import com.kidstv.kiosk.databinding.ActivityLockBinding
 
 /**
@@ -44,6 +49,17 @@ class LockActivity : AppCompatActivity() {
     private var unlockKeyHeld = false
     private var pinShowing = false
 
+    /** 答题区的四个选项，顺序就是布局里的 opt0..opt3 */
+    private val optionViews by lazy {
+        listOf(binding.opt0, binding.opt1, binding.opt2, binding.opt3)
+    }
+
+    /** 当前这道题。null = 该出新题了 */
+    private var item: Quiz.Item? = null
+
+    /** 已经作答，等动画走完 —— 防孩子连按 OK 把四个选项全点一遍 */
+    private var answered = false
+
     private val unlockRunnable = Runnable {
         unlockKeyHeld = false
         if (!pinShowing) askPin()
@@ -66,6 +82,8 @@ class LockActivity : AppCompatActivity() {
 
         // 左下角「家长」：和首页同一个入口。没有它，收不到菜单键的电视在这页就只能干等到点
         binding.parentBtn.setOnClickListener { if (!pinShowing) askPin() }
+
+        setupQuiz()
 
         mode = intent.getStringExtra(EXTRA_MODE) ?: MODE_REST
         refresh()
@@ -98,8 +116,9 @@ class LockActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
-        handler.removeCallbacks(ticker)
-        handler.removeCallbacks(unlockRunnable)
+        // 清掉全部延迟任务：答对后 0.9 秒要 finish、答错后 1.6 秒要换题，
+        // 万一这期间页面被系统销毁，回调里再碰 binding 就会崩
+        handler.removeCallbacksAndMessages(null)
         Voice.release()
         super.onDestroy()
     }
@@ -116,17 +135,130 @@ class LockActivity : AppCompatActivity() {
             }
             binding.titleText.text = "休息一下"
             binding.bigText.text = formatClock(left)
-            binding.subText.text = "看看远处，让眼睛休息一下\n到点自动继续"
+            refreshQuiz()
             binding.hintText.text = "长按菜单键或点左下角「家长」，可提前结束"
         } else {
             val used = Timer.dayUsedSeconds() / 60
             val limit = Config.dailyMinutes
             binding.titleText.text = "今天的时间用完了"
             binding.bigText.text = "明天再来"
+            // 「今天额度用完」是硬上限，不该被做题突破 —— 这一页永远不出题
+            binding.quizPanel.visibility = View.GONE
+            item = null
+            binding.subText.visibility = View.VISIBLE
+            binding.bigText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 92f)
             binding.subText.text = "今天已经看了 $used 分钟" +
                 if (limit > 0) " · 每天 $limit 分钟" else ""
             binding.hintText.text = "长按菜单键或点左下角「家长」，家长可加时"
         }
+    }
+
+    /**
+     * 答题区。三个条件全满足才出现：家长开着、今天还有次数、这一次休息的两回机会还没用完。
+     *
+     * 答题时把倒计时从 92sp 压到 44sp：1080p 上一屏放不下"大字倒计时 + 四宫格选项"，
+     * 硬塞会把题目挤出屏幕，而题目才是这一页现在的主角。
+     */
+    private fun refreshQuiz() {
+        val wrong = Config.quizRestWrong
+        val on = Quiz.available() && wrong < Quiz.MAX_TRIES
+        binding.quizPanel.visibility = if (on) View.VISIBLE else View.GONE
+
+        if (!on) {
+            item = null
+            answered = false
+            binding.subText.visibility = View.VISIBLE
+            binding.bigText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 92f)
+            binding.subText.text =
+                if (Quiz.available() && wrong >= Quiz.MAX_TRIES) {
+                    // 说清"为什么没题了"，否则孩子会以为是坏了
+                    "这次的机会用完了\n到点自动继续"
+                } else {
+                    "看看远处，让眼睛休息一下\n到点自动继续"
+                }
+            return
+        }
+
+        binding.subText.visibility = View.GONE
+        binding.bigText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 44f)
+        if (item == null) {
+            item = Quiz.next()
+            answered = false
+            renderQuestion()
+        }
+    }
+
+    private fun renderQuestion() {
+        val q = item ?: return
+        binding.quizTag.text = "${Quiz.gradeLabel(Config.quizGrade)} · 数学"
+        binding.quizPrompt.text = q.prompt
+        binding.quizFoot.text = "答对可以提前继续 · 今天还能答 ${Quiz.remainingToday()} 次"
+
+        optionViews.forEachIndexed { i, v ->
+            v.text = q.options[i]
+            v.isEnabled = true
+            v.setTextColor(colorOf(R.attr.kioskText))
+            val tv = TypedValue()
+            theme.resolveAttribute(R.attr.kioskKey, tv, true)
+            if (tv.resourceId != 0) v.setBackgroundResource(tv.resourceId)
+        }
+
+        // 遥控器直接按 OK 就能答，不用先摸索焦点在哪
+        binding.quizPanel.post { optionViews.first().requestFocus() }
+    }
+
+    private fun setupQuiz() {
+        optionViews.forEachIndexed { index, v ->
+            v.setOnClickListener { onOption(index) }
+        }
+    }
+
+    private fun onOption(index: Int) {
+        val q = item ?: return
+        if (answered) return
+        answered = true
+
+        val right = optionViews[index].text.toString() == q.answer
+
+        // 答错时也要把正确答案标绿：不标的话孩子不知道为什么错、也没法学
+        optionViews.forEachIndexed { i, v ->
+            v.isEnabled = false
+            val text = v.text.toString()
+            if (text == q.answer) {
+                v.setBackgroundResource(R.drawable.bg_quiz_ok)
+                v.setTextColor(Color.WHITE)
+            } else if (i == index) {
+                v.setBackgroundResource(R.drawable.bg_quiz_bad)
+                v.setTextColor(Color.WHITE)
+            }
+        }
+
+        if (right) {
+            Config.quizUsedToday = Config.quizUsedToday + 1
+            binding.quizFoot.text = "答对啦，继续看"
+            handler.postDelayed({
+                if (isFinishing || isDestroyed) return@postDelayed
+                // endRestEarly 已经把 sessionSeconds 归零，所以回去后要再满一整个
+                // 单次时长才会再休息 —— 不用额外写
+                Timer.endRestEarly()
+                finish()
+            }, 900L)
+        } else {
+            Config.quizRestWrong = Config.quizRestWrong + 1
+            val left = (Quiz.MAX_TRIES - Config.quizRestWrong).coerceAtLeast(0)
+            binding.quizFoot.text = if (left > 0) "再想想，还有 $left 次机会" else "这次机会用完了"
+            handler.postDelayed({
+                if (isFinishing || isDestroyed) return@postDelayed
+                item = null
+                refresh()
+            }, 1600L)
+        }
+    }
+
+    private fun colorOf(attr: Int): Int {
+        val tv = TypedValue()
+        theme.resolveAttribute(attr, tv, true)
+        return if (tv.resourceId != 0) ContextCompat.getColor(this, tv.resourceId) else tv.data
     }
 
     private fun formatClock(seconds: Int): String {

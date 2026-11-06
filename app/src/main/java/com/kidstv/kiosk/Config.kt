@@ -175,6 +175,56 @@ object Config {
                 .apply()
         }
 
+    // ---------------- 答题解锁 ----------------
+
+    /**
+     * 每天最多答对几次可以跳过休息。**0 = 关闭，而且默认就是 0。**
+     *
+     * 为什么不做单独的开关：0 就是关闭，多一个开关只会让家长问"我该关哪个"。
+     * 出厂不开启也很重要 —— 老用户升级后行为必须一点不变，
+     * 否则"我装个更新，孩子突然能靠做题躲过休息了"会引起投诉。
+     */
+    var quizDailyMax: Int
+        get() = App.prefs.getInt("quiz_max", 0).coerceIn(0, 5)
+        set(value) {
+            App.prefs.edit().putInt("quiz_max", value.coerceIn(0, 5)).apply()
+        }
+
+    /** 出题年级 1-6，默认三年级（一年级太简单，六年级对小学生偏难，三年级居中） */
+    var quizGrade: Int
+        get() = App.prefs.getInt("quiz_grade", 3).coerceIn(1, 6)
+        set(value) {
+            App.prefs.edit().putInt("quiz_grade", value.coerceIn(1, 6)).apply()
+        }
+
+    /** 今天已经用掉几次，跨天归零（照 [usedSeconds] 的写法） */
+    var quizUsedToday: Int
+        get() = if (App.prefs.getString("quiz_date", "") == Timer.todayKey())
+            App.prefs.getInt("quiz_used", 0) else 0
+        set(value) {
+            App.prefs.edit()
+                .putString("quiz_date", Timer.todayKey())
+                .putInt("quiz_used", value)
+                .apply()
+        }
+
+    /**
+     * 这次休息已经答错几次。
+     *
+     * 拿 [restUntil] 当"这次休息的身份"：restUntil 一变就是新的一次休息，计数自然归零，
+     * 不需要谁记得去重置 —— 少一处"忘记清"的可能。休息页被看门狗反复拉起也不会重置，
+     * 否则孩子靠"退出再进"就能刷出无限次机会。
+     */
+    var quizRestWrong: Int
+        get() = if (App.prefs.getLong("quiz_rest_at", -1L) == restUntil)
+            App.prefs.getInt("quiz_rest_wrong", 0) else 0
+        set(value) {
+            App.prefs.edit()
+                .putLong("quiz_rest_at", restUntil)
+                .putInt("quiz_rest_wrong", value)
+                .apply()
+        }
+
     // ---------------- 家长门禁 ----------------
 
     /** 验证方式：pin / addsub / muldiv，见 Challenge.Mode。默认沿用原来的数字密码，升级后不会被锁在门外 */

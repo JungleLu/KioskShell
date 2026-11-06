@@ -16,6 +16,11 @@
     <string name="row_single">每次最多看</string>
     <string name="row_rest">每次休息</string>
     <string name="row_daily">每天总共</string>
+    <string name="row_quiz">答题解锁</string>
+    <string name="quiz_off">关闭</string>
+    <string name="quiz_times">%1$d 次/天</string>
+    <string name="row_quiz_hint">▶ 调高才开启</string>
+    <string name="row_grade">年级</string>
     <string name="row_gate">家长验证</string>
     <string name="row_auto">开机自动进应用</string>
     <string name="row_auto_multi">选 1 个才生效</string>
