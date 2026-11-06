@@ -1,6 +1,7 @@
 package com.kidstv.kiosk
 
 import android.app.Activity
+import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -37,6 +38,9 @@ object ParentGateDialog {
         val handler = Handler(Looper.getMainLooper())
         val dialog = AlertDialog.Builder(activity)
             .setView(b.root)
+            // 诊断入口必须放在密码框里，不能只放家长菜单 —— 有人连菜单都进不去，
+            // 那才最需要这一页。它只读、不碰任何设置，所以不需要密码。
+            .setNeutralButton("按键诊断", null)
             .create()
 
         b.gateTitle.text = title
@@ -181,6 +185,14 @@ object ParentGateDialog {
             dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN)
             sizeToScreen(dialog, activity)
             b.root.post { b.k5.requestFocus() }
+            // 必须在这里重设点击：AlertDialog 的按钮默认"点一下就关窗"，
+            // 而家长往往要看着诊断页再回来继续输密码，框不能消失。
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL)?.setOnClickListener {
+                try {
+                    activity.startActivity(Intent(activity, KeyDiagActivity::class.java))
+                } catch (e: Exception) {
+                }
+            }
             val remain = cooldownRemaining()
             if (remain > 0) startCooldown(remain)
         }

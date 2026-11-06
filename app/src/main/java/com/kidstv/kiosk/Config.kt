@@ -33,6 +33,14 @@ object Config {
      */
     private const val PASS_SLEEP_MS = 3 * 60 * 1000L
 
+    /**
+     * 长按菜单键多久算"家长要进来"。
+     *
+     * 放在这里是为了让桌面、锁屏页、按键诊断页用的是同一个数 ——
+     * 诊断页要判断"你按住 3 秒，但我们只收到 480ms"，阈值一旦各写各的，那句结论就不可信了。
+     */
+    const val UNLOCK_LONG_PRESS_MS = 2000L
+
     /** 「这一轮开机已经自动进过应用」记在哪个 boot_id 上 */
     private const val KEY_AUTO_LAUNCH_BOOT = "auto_launch_boot"
 

@@ -39,6 +39,30 @@
         android:textColor="?attr/kioskTextDim"
         android:textSize="14sp" />
 
+    <!--
+      家长入口：和右下角「主题」对称。
+      之所以做成看得见的按钮，是因为「长按菜单键」在部分固件（小米实测）根本不生效 ——
+      遥控器发的码可能被系统截走，用户连密码框都调不出来。这个按钮只依赖 OK 键，谁都按得到。
+      后面还有密码，孩子点了也没用。
+    -->
+    <TextView
+        android:id="@+id/parentBtn"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|start"
+        android:layout_marginStart="20dp"
+        android:layout_marginBottom="20dp"
+        android:background="?attr/kioskPill"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:minHeight="38dp"
+        android:paddingStart="18dp"
+        android:paddingEnd="18dp"
+        android:text="家长"
+        android:textColor="?attr/kioskTextDim"
+        android:textSize="13sp" />
+
     <!-- 主题切换：放在首页，家长一眼能看到。纯装饰，点一下循环换肤 -->
     <TextView
         android:id="@+id/themeBtn"

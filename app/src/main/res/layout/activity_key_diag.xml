@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  按键诊断（隐藏页，只能从密码框或家长菜单进）。
+
+  1080p 电视在 density 320 下实际只有 960×540dp，所以字号都小、两栏都用 weight 分宽度，
+  绝不给整块 wrap_content 撑高 —— 一旦超出去，屏幕上就是看不全，而这一页的全部意义就是"看得全"。
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?attr/kioskBgWindow">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:paddingStart="20dp"
+        android:paddingTop="12dp"
+        android:paddingEnd="20dp"
+        android:paddingBottom="10dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="按键诊断"
+            android:textColor="?attr/kioskTitle"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="把遥控器对着电视按几下。这里只显示按键本身，不联网、不上传。"
+            android:textColor="?attr/kioskTextDim"
+            android:textSize="11sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginTop="8dp"
+            android:layout_weight="1"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="?attr/kioskPanel"
+                android:orientation="vertical"
+                android:padding="12dp">
+
+                <TextView
+                    android:id="@+id/infoText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:lineSpacingExtra="3dp"
+                    android:textColor="?attr/kioskText"
+                    android:textSize="12sp"
+                    android:typeface="monospace" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginStart="10dp"
+                android:layout_weight="1.3"
+                android:background="?attr/kioskPanel"
+                android:orientation="vertical"
+                android:padding="12dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="常见菜单键：MENU(82) / TV_CONTENTS_MENU(256) / SETTINGS(84) / TV_MEDIA_CONTEXT_MENU(257)"
+                    android:textColor="?attr/kioskAccent"
+                    android:textSize="11sp" />
+
+                <TextView
+                    android:id="@+id/emptyHint"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:lineSpacingExtra="5dp"
+                    android:text="还没有收到任何按键。&#10;&#10;如果按了菜单键这里一直是空白，说明这个键的事件根本没进到应用里（被系统或固件吃在前面了）。"
+                    android:textColor="?attr/kioskTextDim"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:id="@+id/keyLog"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:lineSpacingExtra="3dp"
+                    android:textColor="?attr/kioskText"
+                    android:textSize="11sp"
+                    android:typeface="monospace" />
+
+                <TextView
+                    android:id="@+id/summary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:lineSpacingExtra="3dp"
+                    android:textColor="?attr/kioskTextDim"
+                    android:textSize="11sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/btnExit"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="8dp"
+            android:background="?attr/kioskPill"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:minHeight="34dp"
+            android:minWidth="140dp"
+            android:paddingStart="34dp"
+            android:paddingEnd="34dp"
+            android:text="@string/back"
+            android:textColor="?attr/kioskText"
+            android:textSize="15sp" />
+    </LinearLayout>
+</FrameLayout>

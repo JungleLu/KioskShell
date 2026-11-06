@@ -64,6 +64,9 @@ class LockActivity : AppCompatActivity() {
 
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
+        // 左下角「家长」：和首页同一个入口。没有它，收不到菜单键的电视在这页就只能干等到点
+        binding.parentBtn.setOnClickListener { if (!pinShowing) askPin() }
+
         mode = intent.getStringExtra(EXTRA_MODE) ?: MODE_REST
         refresh()
         speak()
@@ -114,7 +117,7 @@ class LockActivity : AppCompatActivity() {
             binding.titleText.text = "休息一下"
             binding.bigText.text = formatClock(left)
             binding.subText.text = "看看远处，让眼睛休息一下\n到点自动继续"
-            binding.hintText.text = "长按菜单键 2 秒可提前结束"
+            binding.hintText.text = "长按菜单键或点左下角「家长」，可提前结束"
         } else {
             val used = Timer.dayUsedSeconds() / 60
             val limit = Config.dailyMinutes
@@ -122,7 +125,7 @@ class LockActivity : AppCompatActivity() {
             binding.bigText.text = "明天再来"
             binding.subText.text = "今天已经看了 $used 分钟" +
                 if (limit > 0) " · 每天 $limit 分钟" else ""
-            binding.hintText.text = "长按菜单键 2 秒家长可加时"
+            binding.hintText.text = "长按菜单键或点左下角「家长」，家长可加时"
         }
     }
 
@@ -142,7 +145,7 @@ class LockActivity : AppCompatActivity() {
         if (isUnlockKey(keyCode)) {
             if (!unlockKeyHeld) {
                 unlockKeyHeld = true
-                handler.postDelayed(unlockRunnable, 2000L)
+                handler.postDelayed(unlockRunnable, Config.UNLOCK_LONG_PRESS_MS)
             }
             return true
         }

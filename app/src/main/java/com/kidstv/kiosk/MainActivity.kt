@@ -25,6 +25,9 @@ class MainActivity : AppCompatActivity() {
     /** 家长动过菜单/门禁，这一轮就别再自动跳应用了 */
     private var suppressAuto = false
 
+    /** 刚从按键诊断页回来。回来那一下要把自动跳转再掐一次（onStop 会把 suppressAuto 复位） */
+    private var diagOpen = false
+
     /**
      * 自动进入目标应用前的宽限时间。
      * 关键不在长短，而在「按任意键就取消自动跳」——家长动一下遥控器就有足够时间长按菜单。
@@ -61,10 +64,12 @@ class MainActivity : AppCompatActivity() {
         // 首页右下角的主题切换：点一下循环换肤。纯外观，不碰锁定状态
         binding.themeBtn.setOnClickListener { toggleTheme() }
         refreshThemeBtn()
+        // 左下角「家长」：看得见的主入口。长按菜单键那条路在部分固件上根本走不通
+        binding.parentBtn.setOnClickListener { showPinDialog() }
         refreshTarget()
 
         if (Config.firstRun) {
-            Toast.makeText(this, "默认密码 123456，长按菜单键可改", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "默认密码 123456，进家长菜单可改", Toast.LENGTH_LONG).show()
             Config.firstRun = false
         }
 
@@ -74,6 +79,14 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+
+        // 从诊断页回来：onStop 已经把 suppressAuto 复位了，这里补一刀，
+        // 免得家长还没看完结论就被自动送进播放器
+        if (diagOpen) {
+            diagOpen = false
+            suppressAuto = true
+            handler.removeCallbacks(autoLaunchRunnable)
+        }
 
         // 重新打开儿童桌面 = 结束「本次放行」。家长从聚好看点图标回来，就自动恢复锁定，
         // 不用再进菜单点一次。（打开放行按钮时是往 HOME 走，不会回到这里，所以不会误清）
@@ -153,7 +166,7 @@ class MainActivity : AppCompatActivity() {
         if (isUnlockKey(keyCode)) {
             if (!unlockKeyHeld) {
                 unlockKeyHeld = true
-                handler.postDelayed(unlockRunnable, 2000L)
+                handler.postDelayed(unlockRunnable, Config.UNLOCK_LONG_PRESS_MS)
             }
             return true
         }
@@ -396,16 +409,18 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun statusText(): String {
+        // 别提「长按菜单键 2 秒」这一个动作：部分固件（小米实测）根本不把菜单键发给应用，
+        // 屏幕上教一个按不出来的手势，等于把人劝退。左下角「家长」按钮才是主入口。
         val base = when {
             Config.kioskMode && Config.passOnce ->
                 "放行中 · 关机/息屏后恢复锁定"
             Config.kioskMode && !watchServiceOn() ->
                 "看门狗没开 · 设置→无障碍→儿童桌面"
-            Config.kioskMode -> "已锁定 · 长按菜单键 2 秒退出"
+            Config.kioskMode -> "已锁定 · 点左下角「家长」退出"
             Kiosk.isDeviceOwner(this) && !Config.policyOk ->
-                "强锁没设置成功 · 长按菜单键 2 秒看看"
-            Kiosk.isDeviceOwner(this) -> "强锁中 · 长按菜单键 2 秒退出"
-            else -> "未锁定 · 长按菜单键 2 秒设置"
+                "强锁没设置成功 · 点左下角「家长」看看"
+            Kiosk.isDeviceOwner(this) -> "强锁中 · 点左下角「家长」退出"
+            else -> "未锁定 · 点左下角「家长」设置"
         }
         return if (Config.autoLaunchDue() && anyTargetInstalled()) {
             "$base · 按任意键取消自动进入"
@@ -458,7 +473,7 @@ class MainActivity : AppCompatActivity() {
      *
      * 目标应用没选或已卸载时只给一句提示，**不打开选择列表** ——
      * 卡片是孩子最常按的按钮，从这里能改目标应用等于把门禁送出去了。
-     * 所有控制类操作只留「长按菜单键 2 秒」一个入口。
+     * 所有控制类操作只留「左下角家长按钮 / 长按菜单键 2 秒」这一个门禁。
      */
     private fun onAppCardClick(pkg: String) {
         if (Config.locked && Config.limitEnabled) {
@@ -536,6 +551,7 @@ class MainActivity : AppCompatActivity() {
         }
         items.add("开机自启检查")
         items.add("系统设置")
+        items.add("按键诊断")
         items.add("修改密码")
         items.add("切换主题")
         items.add("选择应用")
@@ -625,6 +641,7 @@ class MainActivity : AppCompatActivity() {
                 refreshTimeInfo()
             }
             item == "退出儿童桌面" -> exitKiosk()
+            item == "按键诊断" -> openKeyDiag()
             item == "系统设置" -> {
                 // 家长要进系统设置，先把看门狗停 10 分钟，否则一秒就被弹回来
                 Config.watchdogPauseUntil = SystemClock.elapsedRealtime() + WATCH_PAUSE_MS
@@ -734,6 +751,24 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, TimeSettingsActivity::class.java))
         } catch (e: Exception) {
             Toast.makeText(this, "打不开设置页", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /**
+     * 按键诊断：家长怀疑"按了没反应"时，把电视到底收到什么键摆出来。
+     *
+     * 为什么回来还要再掐一次自动跳转：离开桌面会走 onStop，那里把 suppressAuto 复位了，
+     * 回来后如果还在开机窗口内，4 秒后就会被自动送进播放器，家长根本没时间看结论。
+     */
+    private fun openKeyDiag() {
+        diagOpen = true
+        suppressAuto = true
+        handler.removeCallbacks(autoLaunchRunnable)
+        try {
+            startActivity(Intent(this, KeyDiagActivity::class.java))
+        } catch (e: Exception) {
+            diagOpen = false
+            Toast.makeText(this, "打不开诊断页", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -992,7 +1027,7 @@ class MainActivity : AppCompatActivity() {
                 "电脑上执行（电视不能登录任何账号）：\n" +
                 "  adb shell dpm set-device-owner com.kidstv.kiosk/.KioskAdmin\n\n" +
                 "成功后 HOME 键、返回键、最近任务全部失效，\n" +
-                "只能长按菜单键 2 秒 + 密码进家长菜单。"
+                "只能点左下角「家长」+ 密码进家长菜单。"
         } else if (launcher.isEmpty()) {
             "这台电视（$brand）不支持 Device Owner。\n\n" +
                 "保持看门狗就行：设置 → 无障碍 → 打开「儿童桌面」，\n" +

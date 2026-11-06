@@ -73,6 +73,17 @@
             android:screenOrientation="landscape" />
 
         <!--
+          按键诊断：只读页，不导出。
+          入口有两个 —— 密码框里的「按键诊断」和家长菜单里同名项，都是家长主动点开的；
+          configChanges 与其它页保持一致，免得切输入法/旋转时重建把按键记录清空。
+        -->
+        <activity
+            android:name=".KeyDiagActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+
+        <!--
           弱锁：声明成 HOME 的候选。必须 enabled="true" —— 关着的话它连"可选桌面"都算不上，
           系统永远切不过来（家长菜单里点「锁定桌面」也只是弹个空选择框）。
           真要退出，家长菜单里会把这个组件再关掉。

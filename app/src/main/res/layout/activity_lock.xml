@@ -54,8 +54,31 @@
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|center_horizontal"
         android:layout_marginBottom="30dp"
-        android:text="长按菜单键 2 秒，输入家长密码"
+        android:text="长按菜单键或点左下角「家长」，输入家长密码"
         android:textColor="?attr/kioskTextDim"
         android:textSize="14sp" />
+
+    <!--
+      家长入口：和首页同一个按钮。
+      锁屏页如果没有这个，小米这类收不到菜单键的电视就彻底没救了 —— 孩子看到休息页，
+      家长连提前结束都做不到。
+    -->
+    <TextView
+        android:id="@+id/parentBtn"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|start"
+        android:layout_marginStart="20dp"
+        android:layout_marginBottom="20dp"
+        android:background="?attr/kioskPill"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:minHeight="38dp"
+        android:paddingStart="18dp"
+        android:paddingEnd="18dp"
+        android:text="家长"
+        android:textColor="?attr/kioskTextDim"
+        android:textSize="13sp" />
 
 </FrameLayout>

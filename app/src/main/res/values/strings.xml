@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">儿童桌面</string>
-    <string name="not_installed">应用没了，长按菜单键 2 秒重选</string>
+    <string name="not_installed">应用没了，点左下角「家长」重选</string>
     <string name="no_target_title">还没选应用</string>
-    <string name="no_target_hint">长按菜单键 2 秒选择</string>
-    <string name="no_target_toast">还没选应用，长按菜单键 2 秒选择</string>
-    <string name="target_missing_hint">长按菜单键 2 秒重选</string>
-    <string name="target_missing_toast">这个应用已经卸载了，长按菜单键 2 秒重选</string>
+    <string name="no_target_hint">点左下角「家长」选择</string>
+    <string name="no_target_toast">还没选应用，点左下角「家长」选择</string>
+    <string name="target_missing_hint">点左下角「家长」重选</string>
+    <string name="target_missing_toast">这个应用已经卸载了，点左下角「家长」重选</string>
     <string name="parent_pin">家长验证</string>
     <string name="pin_wrong">不对</string>
     <string name="back">返回</string>
