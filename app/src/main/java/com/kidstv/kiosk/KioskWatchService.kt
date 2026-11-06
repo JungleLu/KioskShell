@@ -10,6 +10,7 @@ import android.os.Looper
 import android.os.PowerManager
 import android.os.SystemClock
 import android.provider.Settings
+import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 
 /**
@@ -34,6 +35,15 @@ import android.view.accessibility.AccessibilityEvent
 class KioskWatchService : AccessibilityService() {
 
     companion object {
+        /**
+         * 日志 tag。
+         *
+         * **注意级别用 Info 不用 Debug**：海信 VIDAA 把 D 级日志整个关掉了
+         * （实测 logcat 5000 行里 0 条 D），写 `Log.d` 等于没写，排查时一条都看不到。
+         * Info 只对接了 adb 的人可见，对孩子没有暴露面。
+         */
+        private const val TAG = "KioskWatch"
+
         /** 服务是否连着。家长菜单用它区分"已锁定"和"缺无障碍权限" */
         @Volatile
         var connected = false
@@ -51,6 +61,16 @@ class KioskWatchService : AccessibilityService() {
 
         /** 常态下"被拉到别处"后的最小重拉间隔 */
         private const val ENFORCE_COOLDOWN_MS = 1500L
+
+        /**
+         * 窗口事件报上来之后，先等这么久再确认（v1.38）。
+         *
+         * 固件浮层只闪一下：实测 Ghosten 前台播放时，海信的服务
+         * `com.jamdeo.tv.service` 会插进来发一条 TYPE_WINDOW_STATE_CHANGED，
+         * 紧接着又回到 Ghosten。立刻按它拉人，就把正在看的孩子弹回桌面了。
+         * 等一秒再问系统「现在前台是谁」，这类瞬时窗口早就消失了。
+         */
+        private const val CONFIRM_DELAY_MS = 900L
 
         /**
          * 「前台是谁」这条记录的有效期。
@@ -97,6 +117,13 @@ class KioskWatchService : AccessibilityService() {
     private var lastEnforceAt = 0L
     private var lastLockAt = 0L
     private var lastProbeAt = 0L
+
+    /** 「探测读不到包名」这条日志的节流时间：Flutter 应用会一直读不到，不能每 2 秒刷一条 */
+    private var lastEmptyLogAt = 0L
+
+    /** 窗口事件报上来的「可疑前台」，等 [CONFIRM_DELAY_MS] 之后再确认 */
+    private var pendingPkg: String? = null
+    private var pendingAt = 0L
     private var bootTries = 0
     private var connectedAt = 0L
 
@@ -161,10 +188,31 @@ class KioskWatchService : AccessibilityService() {
         if (pkg in SYSTEM_UI_PKGS) return
         if (isCurrentIme(pkg)) return
 
+        /**
+         * **宽限期内的窗口事件一律不记**（v1.38）。
+         *
+         * 踩过的坑：海信固件在启动应用时会先把系统桌面（`com.ju.main.launcher`）
+         * 闪到前台一下，这条事件就把 [lastFg] 写成了系统桌面。宽限期在这之后才判断，
+         * 所以"不拉人"是对的，但**脏值已经落进去了**；而 Ghosten 是 Flutter 应用
+         * （libflutter.so），既不发 WINDOW_STATE_CHANGED，`rootInActiveWindow`
+         * 也读不到包名 —— [probeForeground] 没有任何机会把脏值纠正回来。
+         * 于是 6 秒宽限一到，巡检读到 `lastFg = 系统桌面`，当场把人从 Ghosten 弹回桌面。
+         * 实测两次都卡在 5.85s / 5.96s，正好等于 [Kiosk.TARGET_GRACE_MS]。
+         *
+         * 代价：宽限期内真跑了也不记。6 秒，且下一拍 probe 就能读到（系统桌面不是
+         * Flutter，读得到），最多晚几秒才拉回来。
+         */
+        if (SystemClock.elapsedRealtime() < Kiosk.targetGraceUntil) {
+            Log.i(TAG, "evt $pkg (ignored: in grace)")
+            return
+        }
+
+        Log.i(TAG, "evt $pkg (lastFg was $lastFg)")
         lastFg = pkg
         lastEventAt = SystemClock.elapsedRealtime()
         if (pkg == packageName) bootTries = 0
-        enforce(pkg)
+        // 不在这里直接拉：窗口事件的包名不等于「孩子现在在哪个应用」（理由见 scheduleCheck）
+        scheduleCheck(pkg)
     }
 
     /** 跑到不该去的地方就拉回来 */
@@ -182,7 +230,75 @@ class KioskWatchService : AccessibilityService() {
         val now = SystemClock.elapsedRealtime()
         if (now - lastEnforceAt < ENFORCE_COOLDOWN_MS) return
         lastEnforceAt = now
+        Log.i(TAG, "PULL src=enforce pkg=$pkg targets=${Config.targets}")
         backToKiosk()
+    }
+
+    // ---------------- 窗口事件：先记下，延迟确认 ----------------
+
+    /**
+     * 把一条窗口事件记成「待确认」，**不立刻拉人**（v1.38）。
+     *
+     * 踩过的坑：窗口事件里的包名不等于「孩子现在在哪个应用」。
+     * 实测两种常见干扰——
+     * 1. 启动应用时海信固件先把系统桌面 `com.ju.main.launcher` 闪到前台；
+     * 2. 播放中固件服务 `com.jamdeo.tv.service` 插进来发一条窗口切换。
+     * 信了这两条，孩子看几秒就被弹回桌面（实测两次都卡在 5.85s / 5.96s，
+     * 正好等于 [Kiosk.TARGET_GRACE_MS]，也就是宽限一到期就清算）。
+     *
+     * 而且 Ghosten 是 Flutter 应用（libflutter.so），既不常发 WINDOW_STATE_CHANGED，
+     * `rootInActiveWindow` 也读不到包名 —— 脏记录没有任何机会被自动纠正回来，
+     * 所以只能从源头管住：事件只当线索，不当判据。
+     */
+    private fun scheduleCheck(pkg: String) {
+        if (pkg == packageName) return
+        if (pkg in Config.targets) return
+        pendingPkg = pkg
+        pendingAt = SystemClock.elapsedRealtime()
+    }
+
+    /** 待确认的线索过了一秒还没被新事件覆盖，就去问一次真实前台 */
+    private fun checkPending() {
+        val pkg = pendingPkg ?: return
+        if (SystemClock.elapsedRealtime() - pendingAt < CONFIRM_DELAY_MS) return
+        pendingPkg = null
+        confirmAndEnforce(pkg)
+    }
+
+    /**
+     * 拉人之前，先问系统「现在前台到底是谁」。
+     *
+     * - 读到目标应用 / 自己 → 刚才那条是旁路窗口，放过
+     * - **读到空** → 前台是不暴露无障碍内容的应用（Flutter、全屏 SurfaceView），
+     *   大概率就是正在看的目标应用，放过。真跑到系统桌面时一定读得到，
+     *   2 秒内会被 [probeForeground] 抓回来，锁不会漏
+     * - 读到别的应用 → 确认跑掉了，拉回
+     */
+    private fun confirmAndEnforce(evtPkg: String) {
+        if (!Config.kioskMode) return
+        if (Config.passOnce) return
+        if (!screenOn) return
+        if (SystemClock.elapsedRealtime() < Config.watchdogPauseUntil) return
+        if (SystemClock.elapsedRealtime() < Kiosk.targetGraceUntil) return
+
+        val real = readForeground()
+        if (real.isEmpty() || real == packageName || real in Config.targets) {
+            Log.i(TAG, "skip evt=$evtPkg real=${real.ifEmpty { "(empty)" }}")
+            return
+        }
+
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastEnforceAt < ENFORCE_COOLDOWN_MS) return
+        lastEnforceAt = now
+        Log.i(TAG, "PULL src=confirm evt=$evtPkg real=$real targets=${Config.targets}")
+        backToKiosk()
+    }
+
+    /** 只取包名，不读界面内容和文字 */
+    private fun readForeground(): String = try {
+        rootInActiveWindow?.packageName?.toString().orEmpty()
+    } catch (e: Exception) {
+        ""
     }
 
     // ---------------- 每秒一拍 ----------------
@@ -195,6 +311,9 @@ class KioskWatchService : AccessibilityService() {
         // 主动校正「前台是谁」：有的固件切回系统桌面不发窗口事件，光等事件会一直以为
         // 还在自己桌面上，按 HOME 跑掉也拉不回来（v1.33）
         probeForeground()
+
+        // 窗口事件报上来的「跑到别处了」，等够一秒再确认（v1.38）
+        checkPending()
 
         // GuardService 被系统掐掉时由这里接管计时，否则"看了多久"永远不涨
         val tick = if (GuardService.alive) Timer.TickResult.NONE else Timer.tick()
@@ -217,16 +336,24 @@ class KioskWatchService : AccessibilityService() {
         val now = SystemClock.elapsedRealtime()
         if (now - lastProbeAt < PROBE_INTERVAL_MS) return
         lastProbeAt = now
-        val pkg = try {
-            rootInActiveWindow?.packageName?.toString().orEmpty()
-        } catch (e: Exception) {
-            ""
+        val pkg = readForeground()
+        // 拿不到（视频全屏、SurfaceView、Flutter 的空语义树）就保持原记录，别瞎猜
+        if (pkg.isEmpty()) {
+            if (now - lastEmptyLogAt > 30_000L) {
+                lastEmptyLogAt = now
+                Log.i(TAG, "probe empty (keep lastFg=$lastFg)")
+            }
+            return
         }
-        // 拿不到（视频全屏、SurfaceView 之类）就保持原记录，别瞎猜
-        if (pkg.isEmpty()) return
         if (pkg in SYSTEM_UI_PKGS) return
         if (isCurrentIme(pkg)) return
         if (pkg == lastFg) return
+        // 宽限期内同样不记：启动过渡期的窗口不值得当证据（理由见 onAccessibilityEvent）
+        if (now < Kiosk.targetGraceUntil) {
+            Log.i(TAG, "probe $pkg (ignored: in grace)")
+            return
+        }
+        Log.i(TAG, "probe $pkg (lastFg was $lastFg)")
         lastFg = pkg
         lastEventAt = now
         enforce(pkg)
@@ -281,8 +408,10 @@ class KioskWatchService : AccessibilityService() {
             if (!booting) return
             if (bootTries >= BOOT_MAX_TRIES) return
             if (now - lastEnforceAt < BOOT_RETRY_MS) return
+            if (!escapeConfirmed()) return
             bootTries++
             lastEnforceAt = now
+            Log.i(TAG, "PULL src=boot lastFg=(empty) try=$bootTries")
             backToKiosk()
             return
         }
@@ -291,8 +420,28 @@ class KioskWatchService : AccessibilityService() {
         if (!fresh && !booting) return
 
         if (now - lastEnforceAt < ENFORCE_COOLDOWN_MS) return
+        // 最后一道闸：lastFg 来自窗口事件，固件浮层会让它失真（v1.38）
+        if (!escapeConfirmed()) return
         lastEnforceAt = now
+        Log.i(TAG, "PULL src=watchBoot lastFg=$lastFg fresh=$fresh booting=$booting targets=${Config.targets}")
         backToKiosk()
+    }
+
+    /**
+     * 兜底巡检动手前的最后一道闸：直接问系统「现在前台是谁」。
+     *
+     * 返回 true = 确认跑掉了。
+     * 返回 false 的三种情况：读到自己 / 读到目标应用 / **什么都读不到**。
+     * 最后那种最常见于 Flutter 应用（Ghosten）—— 前台就是目标应用，只是它的
+     * 无障碍树是空的。宁可放过一秒钟，也不能把正在看动画片的孩子弹回桌面。
+     */
+    private fun escapeConfirmed(): Boolean {
+        val real = readForeground()
+        if (real.isEmpty() || real == packageName || real in Config.targets) {
+            Log.i(TAG, "confirm skip real=${real.ifEmpty { "(empty)" }} lastFg=$lastFg")
+            return false
+        }
+        return true
     }
 
     // ---------------- 息屏 / 亮屏 ----------------

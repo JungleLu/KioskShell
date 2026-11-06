@@ -11,8 +11,8 @@ android {
         applicationId = "com.kidstv.kiosk"
         minSdk = 21
         targetSdk = 34
-        versionCode = 37
-        versionName = "1.36"
+        versionCode = 39
+        versionName = "1.38"
     }
 
     buildTypes {

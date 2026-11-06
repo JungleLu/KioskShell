@@ -40,6 +40,7 @@ object Kiosk {
 
     private fun markTargetLaunched() {
         targetGraceUntil = android.os.SystemClock.elapsedRealtime() + TARGET_GRACE_MS
+        android.util.Log.i("KioskWatch", "grace +${TARGET_GRACE_MS}ms")
     }
 
     private fun dpm(ctx: Context): DevicePolicyManager? =
