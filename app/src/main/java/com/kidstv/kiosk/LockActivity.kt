@@ -204,7 +204,24 @@ class LockActivity : AppCompatActivity() {
         }
 
         // 遥控器直接按 OK 就能答，不用先摸索焦点在哪
-        binding.quizPanel.post { optionViews.first().requestFocus() }
+        focusFirstOption()
+    }
+
+    /**
+     * 把焦点放到第一个选项上。
+     *
+     * 不能只 post 一次：quizPanel 从 GONE 变 VISIBLE 的同一帧里，子视图还没测量完，
+     * `requestFocus()` 会直接返回 false —— 表现就是"页面出来了，按 OK 没反应"，
+     * 得先按一下方向键才能进到选项里（v1.36 装机实测复现）。
+     * 所以改成失败重试：第一帧没拿到就每 100ms 再要一次，最多 6 次。
+     */
+    private fun focusFirstOption(tries: Int = 0) {
+        handler.postDelayed({
+            if (isFinishing || isDestroyed) return@postDelayed
+            if (binding.quizPanel.visibility != View.VISIBLE) return@postDelayed
+            if (optionViews.firstOrNull()?.requestFocus() == true) return@postDelayed
+            if (tries < 5) focusFirstOption(tries + 1)
+        }, if (tries == 0) 0L else 100L)
     }
 
     private fun setupQuiz() {
