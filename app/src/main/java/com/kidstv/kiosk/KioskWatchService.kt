@@ -65,10 +65,13 @@ class KioskWatchService : AccessibilityService() {
         /**
          * 窗口事件报上来之后，先等这么久再确认（v1.38）。
          *
-         * 固件浮层只闪一下：实测 Ghosten 前台播放时，海信的服务
-         * `com.jamdeo.tv.service` 会插进来发一条 TYPE_WINDOW_STATE_CHANGED，
-         * 紧接着又回到 Ghosten。立刻按它拉人，就把正在看的孩子弹回桌面了。
+         * 固件浮层只闪一下：任何品牌的固件服务都可能在前台应用之上插一条
+         * TYPE_WINDOW_STATE_CHANGED（实测案例：海信是 `com.jamdeo.tv.service`，
+         * 播放动画片时插进来，紧接着又回到播放器）。立刻按它拉人，就把正在看的孩子弹回桌面了。
          * 等一秒再问系统「现在前台是谁」，这类瞬时窗口早就消失了。
+         *
+         * **判据是"真实前台是谁"，不是"这条事件的包名在不在黑名单里"**，
+         * 所以换任何品牌、任何固件服务都不用改这里。
          */
         private const val CONFIRM_DELAY_MS = 900L
 
@@ -101,8 +104,15 @@ class KioskWatchService : AccessibilityService() {
          * 状态栏、音量条、电源菜单、授权弹窗都挂在这里，一秒钟能来好几个事件，
          * 不排除的话会把孩子正在看的画面反复打断。
          *
-         * 这两个是 AOSP 固定包名，各品牌定制固件（含小米、海信）也都沿用，
-         * 所以这里可以直接写死 —— 真正会变的桌面包名是运行时探测的。
+         * **这里只能放 AOSP 固定包名，任何品牌专属包名都不许加进来。**
+         * `com.android.systemui` 和 `android` 由 AOSP 定义，所有安卓设备都有；
+         * 而各品牌固件服务各不相同（海信 `com.jamdeo.tv.service`、小米和 TCL 又是另一套），
+         * 按品牌枚举永远追不完，漏一个就会误拉。
+         *
+         * v1.38 起品牌浮层由「事件只当线索 + 拉人前读真实前台」吸收，
+         * 不需要也不应该在这里维护名单。真遇到某品牌常驻浮层造成误拉，
+         * 先看 `adb logcat -s KioskWatch` 里的 `evt=... real=...` 确认真实前台是谁，
+         * 再决定怎么处理，不要凭猜加包名。
          */
         private val SYSTEM_UI_PKGS = setOf("com.android.systemui", "android")
     }
@@ -191,13 +201,16 @@ class KioskWatchService : AccessibilityService() {
         /**
          * **宽限期内的窗口事件一律不记**（v1.38）。
          *
-         * 踩过的坑：海信固件在启动应用时会先把系统桌面（`com.ju.main.launcher`）
-         * 闪到前台一下，这条事件就把 [lastFg] 写成了系统桌面。宽限期在这之后才判断，
-         * 所以"不拉人"是对的，但**脏值已经落进去了**；而 Ghosten 是 Flutter 应用
-         * （libflutter.so），既不发 WINDOW_STATE_CHANGED，`rootInActiveWindow`
-         * 也读不到包名 —— [probeForeground] 没有任何机会把脏值纠正回来。
-         * 于是 6 秒宽限一到，巡检读到 `lastFg = 系统桌面`，当场把人从 Ghosten 弹回桌面。
+         * 通用规则：启动目标应用的那几秒，固件会插一串过渡窗口进前台
+         * （实测案例：海信在启动时先把系统桌面 `com.ju.main.launcher` 闪到前台一下）。
+         * 旧代码收到就写 [lastFg]，宽限期只是不立刻拉，但**脏值已经落进去了**；
+         * 而 Flutter 类应用（`libflutter.so`）既不发 WINDOW_STATE_CHANGED，
+         * `rootInActiveWindow` 也读不到包名 —— [probeForeground] 没有任何机会把脏值纠正回来。
+         * 于是 6 秒宽限一到，巡检读到 `lastFg = 系统桌面`，当场把孩子弹回桌面。
          * 实测两次都卡在 5.85s / 5.96s，正好等于 [Kiosk.TARGET_GRACE_MS]。
+         *
+         * 这条规则不看品牌：任何固件在冷启动期都可能甩出过渡窗口，
+         * 一律不记即可，不需要知道它是谁。
          *
          * 代价：宽限期内真跑了也不记。6 秒，且下一拍 probe 就能读到（系统桌面不是
          * Flutter，读得到），最多晚几秒才拉回来。
@@ -239,16 +252,19 @@ class KioskWatchService : AccessibilityService() {
     /**
      * 把一条窗口事件记成「待确认」，**不立刻拉人**（v1.38）。
      *
-     * 踩过的坑：窗口事件里的包名不等于「孩子现在在哪个应用」。
-     * 实测两种常见干扰——
-     * 1. 启动应用时海信固件先把系统桌面 `com.ju.main.launcher` 闪到前台；
-     * 2. 播放中固件服务 `com.jamdeo.tv.service` 插进来发一条窗口切换。
+     * 踩过的坑（与品牌无关，任何固件都可能发生）：窗口事件里的包名不等于
+     * 「孩子现在在哪个应用」。实测两种常见干扰——
+     * 1. 启动应用时固件先把系统桌面闪到前台（海信实测是 `com.ju.main.launcher`）；
+     * 2. 播放中固件服务插进来发一条窗口切换（海信实测是 `com.jamdeo.tv.service`）。
      * 信了这两条，孩子看几秒就被弹回桌面（实测两次都卡在 5.85s / 5.96s，
      * 正好等于 [Kiosk.TARGET_GRACE_MS]，也就是宽限一到期就清算）。
      *
-     * 而且 Ghosten 是 Flutter 应用（libflutter.so），既不常发 WINDOW_STATE_CHANGED，
+     * 而且 Flutter 类应用（`libflutter.so`）既不常发 WINDOW_STATE_CHANGED，
      * `rootInActiveWindow` 也读不到包名 —— 脏记录没有任何机会被自动纠正回来，
      * 所以只能从源头管住：事件只当线索，不当判据。
+     *
+     * 注意上面两个包名只是"现场记录"，没有参与任何判断 —— 这段逻辑对
+     * 海信 / 小米 / TCL / 索尼 / 盒子同样生效，不需要维护品牌表。
      */
     private fun scheduleCheck(pkg: String) {
         if (pkg == packageName) return
@@ -432,8 +448,13 @@ class KioskWatchService : AccessibilityService() {
      *
      * 返回 true = 确认跑掉了。
      * 返回 false 的三种情况：读到自己 / 读到目标应用 / **什么都读不到**。
-     * 最后那种最常见于 Flutter 应用（Ghosten）—— 前台就是目标应用，只是它的
-     * 无障碍树是空的。宁可放过一秒钟，也不能把正在看动画片的孩子弹回桌面。
+     * 最后那种最常见于 Flutter、自绘界面、全屏 SurfaceView 播放器（实测 Ghosten 就是）——
+     * 前台就是目标应用，只是它的无障碍树是空的。这与品牌无关，各家播放器都可能读不到。
+     * 宁可放过一秒钟，也不能把正在看动画片的孩子弹回桌面。
+     *
+     * 反过来的代价：某个品牌的系统桌面要是也读不到无障碍树，这一条会变成"漏锁"。
+     * 取舍是故意的 —— 误拉（孩子正看着被弹回）比漏锁（孩子多跑出去一会儿）更烦人，
+     * 遇到后者先看日志里 `real=(empty)` 出现在哪个包上，再决定怎么补。
      */
     private fun escapeConfirmed(): Boolean {
         val real = readForeground()

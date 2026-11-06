@@ -24,6 +24,7 @@
   2. 事件先记成"待确认"，等 900ms 再确认 —— 固件浮层只闪一下，等它过去；
   3. 拉人之前问一次系统「现在前台到底是谁」（`rootInActiveWindow`），读到目标应用 / 自己 / **读不到** 都放过。真跑到系统桌面时一定读得到，2 秒内仍会被拉回，**锁没有变松**。
 - **顺带**：看门狗日志改用 `Log.i`。海信 VIDAA 把 D 级日志整个关掉了（实测 5000 行里 0 条 D），写 `Log.d` 等于没写。
+- **判据不看品牌**：这次改动没有写死任何品牌包名 —— 代码里唯一的包名白名单是 AOSP 的 `com.android.systemui` / `android`（所有安卓设备都有），目标应用是家长在菜单里选的，系统桌面包名是运行时探测的。上面出现的 `com.ju.main.launcher`、`com.jamdeo.tv.service` 只是**现场记录**，不参与任何判断，换小米 / TCL / 索尼 / 盒子都不用改代码。
 
 **电视实测**：进 Ghosten 首页 40 秒不弹；播放动画片 30 秒不弹；期间抓到 `evt com.jamdeo.tv.service → skip real=com.ghosten.player`；按 HOME 仍正常拉回（`PULL src=watchBoot lastFg=com.jamdeo.tv.vod`）。
 
