@@ -337,14 +337,13 @@ object Kiosk {
     }
 
     private fun openHomeSettings(ctx: Context) {
-        val flag = Intent.FLAG_ACTIVITY_NEW_TASK
         try {
-            ctx.startActivity(Intent(Settings.ACTION_HOME_SETTINGS).addFlags(flag))
+            ctx.startActivity(
+                Intent(Settings.ACTION_HOME_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
         } catch (e: Exception) {
-            try {
-                ctx.startActivity(Intent(Settings.ACTION_SETTINGS).addFlags(flag))
-            } catch (ignored: Exception) {
-            }
+            // 各家固件对设置 action 的支持差别很大，交给统一降级链（v1.40）
+            SettingsLauncher.openSettings(ctx)
         }
     }
 }

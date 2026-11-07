@@ -1,7 +1,6 @@
 package com.kidstv.kiosk
 
 import android.content.Intent
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -34,9 +33,44 @@ class MainActivity : AppCompatActivity() {
      */
     private val autoLaunchDelay = 4000L
 
+    /**
+     * 刚把外部设置页拉起来的时刻（uptime，0 = 没有待校验的跳转）。
+     *
+     * 为什么要校验：有的固件会先把设置页显示出来、半秒后自己关掉（实测海信
+     * `com.hisense.systemsettings.MainActivity` 曾这样），`startActivity` 一声不响地成功，
+     * 家长看到的却是"点了没反应"。
+     *
+     * 判定方式不是"我们多快回来"—— 设置应用冷启动要几百毫秒，中途我们的界面会短暂
+     * 回到前台，用时间差判会误报（实测 575ms 就误判过一次）。改成**过 2.5 秒看自己还
+     * 有没有窗口焦点**：对方真站住了，我们就是失焦状态；还站在自己界面上，才是没打开。
+     */
+    private var pendingLandingAt = 0L
+
+    private val landingCheck = Runnable {
+        val at = pendingLandingAt
+        pendingLandingAt = 0
+        if (at == 0L) return@Runnable
+        if (!hasWindowFocus()) return@Runnable
+        android.util.Log.i(
+            "KioskSettings",
+            "landing: 跳出去 ${SystemClock.elapsedRealtime() - at}ms 后仍在自己界面，判定没打开"
+        )
+        showManualSettingsGuide()
+    }
+
+    /** 起一次"设置页到底开没开"的校验。只在确实发起了跳转后调用 */
+    private fun armLandingCheck() {
+        pendingLandingAt = SystemClock.elapsedRealtime()
+        handler.removeCallbacks(landingCheck)
+        handler.postDelayed(landingCheck, LANDING_CHECK_MS)
+    }
+
     companion object {
         /** 家长进系统设置 / 无障碍设置时，看门狗暂停多久 */
         private const val WATCH_PAUSE_MS = 10 * 60 * 1000L
+
+        /** 跳出去之后等这么久再确认对方有没有站住（要留够设置应用冷启动的时间） */
+        private const val LANDING_CHECK_MS = 2500L
     }
 
     private val autoLaunchRunnable = Runnable {
@@ -655,10 +689,14 @@ class MainActivity : AppCompatActivity() {
             item == "系统设置" -> {
                 // 家长要进系统设置，先把看门狗停 10 分钟，否则一秒就被弹回来
                 Config.watchdogPauseUntil = SystemClock.elapsedRealtime() + WATCH_PAUSE_MS
-                try {
-                    startActivity(Intent(android.provider.Settings.ACTION_SETTINGS))
-                } catch (e: Exception) {
-                    Toast.makeText(this, "打不开系统设置", Toast.LENGTH_SHORT).show()
+                // 不再只发一个 ACTION_SETTINGS：小米等固件根本不声明这个 action，
+                // 旧版直接抛异常，家长只看到一句"打不开系统设置"（v1.40 修）
+                val landing = SettingsLauncher.openSettings(this)
+                if (landing == SettingsLauncher.Landing.NOTHING) {
+                    showManualSettingsGuide()
+                } else {
+                    // 有的固件会"打开一下又关掉"，由 onResume 里的落地校验兜住
+                    armLandingCheck()
                 }
             }
             item == "修改密码" -> changePin()
@@ -714,14 +752,52 @@ class MainActivity : AppCompatActivity() {
      *
      * 这里的状态其实是矛盾的——权限已经掉了，看门狗本来就没在跑。仍然设一次暂停，
      * 是因为家长点完开关、服务刚被系统绑上，看门狗会立刻活过来，正好把他从设置页弹走。
+     *
+     * v1.40 起不再假定系统一定接 `ACTION_ACCESSIBILITY_SETTINGS`：小米电视就不接，
+     * 旧版在这里只弹一句"打不开无障碍设置"，等于把家长堵死。改为逐级降级，
+     * 最差也会给出能照做的手动路径（[showManualSettingsGuide]）。
      */
     private fun openAccessibilitySettings() {
         Config.watchdogPauseUntil = SystemClock.elapsedRealtime() + WATCH_PAUSE_MS
-        try {
-            startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS))
-        } catch (e: Exception) {
-            Toast.makeText(this, "打不开无障碍设置，请手动进系统设置", Toast.LENGTH_LONG).show()
+        when (SettingsLauncher.openAccessibility(this)) {
+            SettingsLauncher.Landing.ACCESSIBILITY ->
+                // 直接落在开关那一屏，不用教
+                armLandingCheck()
+            SettingsLauncher.Landing.SETTINGS_ROOT,
+            SettingsLauncher.Landing.OTHER_PAGE -> {
+                Toast.makeText(
+                    this,
+                    "已打开设置，请找「无障碍」→「儿童桌面」并打开",
+                    Toast.LENGTH_LONG
+                ).show()
+                armLandingCheck()
+            }
+            SettingsLauncher.Landing.NOTHING -> showManualSettingsGuide()
         }
+    }
+
+    /**
+     * 最后一条路：这台电视不认任何"帮家长跳过去"的方式。
+     *
+     * 只弹一句"打不开"是最差的做法——家长既不知道错在哪，也不知道下一步该按什么。
+     * 这里给的是能照着做的三步，顺手把"回原桌面"做成按钮：
+     * 电视设置只存在于原桌面的入口里，那就得先回去。
+     */
+    private fun showManualSettingsGuide() {
+        AlertDialog.Builder(this)
+            .setTitle("这台电视不让应用直接打开设置")
+            .setMessage(
+                "有些固件把设置入口藏起来了（小米电视就是这样）。\n" +
+                    "手动走一遍，只需一次：\n\n" +
+                    "1. 点下面的「回原桌面」\n" +
+                    "2. 在原桌面里打开「设置」/「系统设置」\n" +
+                    "3. 找到「无障碍」→「儿童桌面」→ 打开\n" +
+                    "   （有的电视把无障碍放在「更多设置」或「通用设置」里）\n\n" +
+                    "10 分钟内不会被弹回来；按 HOME 回儿童桌面后锁定自动恢复。"
+            )
+            .setPositiveButton("回原桌面") { _, _ -> passToStockLauncher() }
+            .setNegativeButton("知道了", null)
+            .show()
     }
 
     /** 退出儿童桌面：关看门狗 + 撤掉自己的桌面身份，电视原样回来 */
@@ -839,20 +915,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun openOverlaySettings() {
-        try {
-            startActivity(
-                Intent(
-                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    Uri.parse("package:$packageName")
-                )
-            )
-        } catch (e: Exception) {
-            try {
-                startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION))
-            } catch (e2: Exception) {
-                Toast.makeText(this, "打不开，请到 设置→应用→儿童桌面 手动授权", Toast.LENGTH_LONG)
-                    .show()
-            }
+        Config.watchdogPauseUntil = SystemClock.elapsedRealtime() + WATCH_PAUSE_MS
+        // 同一个毛病：悬浮窗页也不是所有固件都认，走统一降级链（v1.40）
+        if (SettingsLauncher.openOverlay(this, packageName) == SettingsLauncher.Landing.NOTHING) {
+            showManualSettingsGuide()
+        } else {
+            armLandingCheck()
         }
     }
 

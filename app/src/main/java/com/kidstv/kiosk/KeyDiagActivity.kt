@@ -163,6 +163,8 @@ class KeyDiagActivity : AppCompatActivity() {
             line("桌面", "${Kiosk.stockLauncherName(this@KeyDiagActivity)}（$stockPkg）")
             line("本应用", "${info?.versionName}（code $code）")
             line("无障碍", mark(Kiosk.isWatchServiceEnabled(this@KeyDiagActivity)))
+            // "点系统设置没反应 / 打不开"时，这一行就是结论：有没有入口、有几个备用
+            line("设置入口", SettingsLauncher.probeSummary(this@KeyDiagActivity))
             line("强锁", "${mark(Kiosk.isDeviceOwner(this@KeyDiagActivity))} · 锁定中 ${mark(Config.kioskMode)}")
         }
     }

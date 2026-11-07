@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -13,6 +14,15 @@
       再写一次就能成功 —— 看门狗（锁桌面）全靠无障碍。普通电视上不需要它。
     -->
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
+    <!--
+      跨品牌关键：找「设置类应用」用。各品牌设置程序的包名五花八门（com.xiaomi.mitv.settings、
+      com.android.tv.settings、com.tcl.settings……），既不能写死，也没法靠标准 action 反查——
+      小米电视压根不声明 android.settings.SETTINGS。只能拿到安装列表按"包名含 setting"筛。
+      Android 11+ 不声明它就只能看见自己，筛选结果为空，降级链直接断掉。
+    -->
+    <uses-permission
+        android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
 
     <uses-feature
         android:name="android.software.leanback"
@@ -30,6 +40,19 @@
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+        </intent>
+        <!-- 设置类入口：解析和"能不能打开"的预检都靠这几条（v1.40） -->
+        <intent>
+            <action android:name="android.settings.SETTINGS" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.ACCESSIBILITY_SETTINGS" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.MANAGE_OVERLAY_PERMISSION" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.DEVICE_INFO_SETTINGS" />
         </intent>
     </queries>
 
