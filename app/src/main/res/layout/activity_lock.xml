@@ -13,9 +13,9 @@
         android:minWidth="560dp"
         android:orientation="vertical"
         android:paddingStart="72dp"
-        android:paddingTop="30dp"
+        android:paddingTop="44dp"
         android:paddingEnd="72dp"
-        android:paddingBottom="30dp">
+        android:paddingBottom="48dp">
 
         <TextView
             android:id="@+id/titleText"
@@ -30,7 +30,7 @@
             android:id="@+id/bigText"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
+            android:layout_marginTop="24dp"
             android:text="05:00"
             android:textColor="?attr/kioskAccent"
             android:textSize="92sp"
@@ -51,16 +51,12 @@
           答题区。默认 GONE：家长没开这个功能时，这一页和原来一模一样。
           不新开 Activity 是有原因的 —— 看门狗每 8 秒会把这个页面重新拉起来一次，
           两个 Activity 会互相打架，返回栈也会乱。
-
-          面板的内边距比原来紧（上下 30dp，原来是 44/48）：加上四宫格之后整块高度
-          会顶到屏幕底部那行「长按菜单键或点左下角家长」上面去，压住字。
-          实测 1080p 上省下的这 50dp 刚好让两行分开。
         -->
         <LinearLayout
             android:id="@+id/quizPanel"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
+            android:layout_marginTop="14dp"
             android:gravity="center_horizontal"
             android:orientation="vertical"
             android:visibility="gone">
@@ -121,7 +117,7 @@
                 android:id="@+id/quizFoot"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
+                android:layout_marginTop="10dp"
                 android:gravity="center"
                 android:text=""
                 android:textColor="?attr/kioskTextDim"
