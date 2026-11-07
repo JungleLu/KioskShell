@@ -28,6 +28,15 @@ class MainActivity : AppCompatActivity() {
     private var diagOpen = false
 
     /**
+     * 刚从菜单里跳去二级页面（观看时长 / 按键诊断），回来要把菜单补回来。
+     *
+     * 踩过的坑：家长菜单是 `AlertDialog.setItems()` 弹的，**点中任何一项对话框就自动关了**。
+     * 二级页面按返回只是 `finish()`，回到桌面时菜单早已不在，家长只能重新点左下角「家长」
+     * 再答一遍两位数题 —— 明明什么都没改，却像被踢出了菜单（v1.41 修）。
+     */
+    private var reopenMenuOnResume = false
+
+    /**
      * 自动进入目标应用前的宽限时间。
      * 关键不在长短，而在「按任意键就取消自动跳」——家长动一下遥控器就有足够时间长按菜单。
      */
@@ -152,6 +161,15 @@ class MainActivity : AppCompatActivity() {
             Timer.restRemainingSeconds() > 0 -> LockActivity.open(this, LockActivity.MODE_REST)
             Config.dayBlocked -> LockActivity.open(this, LockActivity.MODE_DAY)
             else -> scheduleAutoLaunch()
+        }
+
+        // 从二级页面退回来：把家长菜单补回原位（不用重新点「家长」、不用再答题）。
+        // 休息锁屏 / 额度用完时不该盖一层菜单上去，所以只在桌面可用的状态下补。
+        if (reopenMenuOnResume) {
+            reopenMenuOnResume = false
+            if (Timer.restRemainingSeconds() <= 0 && !Config.dayBlocked) {
+                handler.post { showParentMenu() }
+            }
         }
     }
 
@@ -845,6 +863,8 @@ class MainActivity : AppCompatActivity() {
         handler.removeCallbacks(autoLaunchRunnable)
         try {
             startActivity(Intent(this, TimeSettingsActivity::class.java))
+            // 菜单在点这一项的瞬间就被对话框关掉了，回来时补上（见字段注释）
+            reopenMenuOnResume = true
         } catch (e: Exception) {
             Toast.makeText(this, "打不开设置页", Toast.LENGTH_SHORT).show()
         }
@@ -862,6 +882,8 @@ class MainActivity : AppCompatActivity() {
         handler.removeCallbacks(autoLaunchRunnable)
         try {
             startActivity(Intent(this, KeyDiagActivity::class.java))
+            // 同上：回来把家长菜单补回来，不让家长重新答题
+            reopenMenuOnResume = true
         } catch (e: Exception) {
             diagOpen = false
             Toast.makeText(this, "打不开诊断页", Toast.LENGTH_SHORT).show()
