@@ -21,9 +21,6 @@ class TimeSettingsActivity : AppCompatActivity() {
     private val restOptions = intArrayOf(0, 1, 3, 5, 10, 15, 20, 30)
     private val dailyOptions = intArrayOf(0, 30, 45, 60, 90, 120, 150, 180)
 
-    /** 0 就是关闭，所以这里没有开关项 —— 家长把它调到 0 就等于关掉 */
-    private val quizOptions = intArrayOf(0, 1, 2, 3, 4, 5)
-
     override fun onCreate(savedInstanceState: Bundle?) {
         KioskTheme.apply(this)
         super.onCreate(savedInstanceState)
@@ -38,13 +35,6 @@ class TimeSettingsActivity : AppCompatActivity() {
         }
         bindStepRow(b.rowDaily) { dir ->
             Config.dailyMinutes = shift(dailyOptions, Config.dailyMinutes, dir)
-        }
-        bindStepRow(b.rowQuiz) { dir ->
-            Config.quizDailyMax = shift(quizOptions, Config.quizDailyMax, dir)
-        }
-        bindStepRow(b.rowGrade) { dir ->
-            // 循环 1→6→1：遥控器只有左右，到头顶住不动比绕回去更让人困惑
-            Config.quizGrade = ((Config.quizGrade - 1 + dir + 6) % 6) + 1
         }
         bindStepRow(b.rowGate) { dir ->
             Config.gateMode = shiftMode(Config.gateMode, dir).key
@@ -68,9 +58,6 @@ class TimeSettingsActivity : AppCompatActivity() {
             Config.limitEnabled = true
             Config.gateMode = "pin"
             Config.voiceEnabled = true
-            // 答题解锁也回到出厂状态：关掉。不然"恢复默认"之后孩子还能靠做题躲休息
-            Config.quizDailyMax = 0
-            Config.quizGrade = 3
             render()
         }
         b.btnBack.setOnClickListener { finish() }
@@ -137,18 +124,6 @@ class TimeSettingsActivity : AppCompatActivity() {
         b.rowDaily.rowLabel.text = getString(R.string.row_daily)
         b.rowDaily.rowValue.text = minutesText(Config.dailyMinutes, 0)
         b.rowDaily.rowHint.text = "◀ ▶"
-
-        b.rowQuiz.rowLabel.text = getString(R.string.row_quiz)
-        b.rowQuiz.rowValue.text =
-            if (Config.quizDailyMax <= 0) getString(R.string.quiz_off)
-            else getString(R.string.quiz_times, Config.quizDailyMax)
-        // 关闭状态下把「怎么开启」直接写在行尾，省得家长到处找开关（本来就没有开关）
-        b.rowQuiz.rowHint.text =
-            if (Config.quizDailyMax <= 0) getString(R.string.row_quiz_hint) else "◀ ▶"
-
-        b.rowGrade.rowLabel.text = getString(R.string.row_grade)
-        b.rowGrade.rowValue.text = Quiz.gradeLabel(Config.quizGrade)
-        b.rowGrade.rowHint.text = "◀ ▶"
 
         b.rowGate.rowLabel.text = getString(R.string.row_gate)
         b.rowGate.rowValue.text = Challenge.Mode.of(Config.gateMode).label

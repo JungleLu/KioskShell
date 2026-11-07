@@ -128,21 +128,4 @@
         <item name="android:textSize">24sp</item>
     </style>
 
-    <!--
-      答题选项。固定宽度 + 固定高度，不用 weight：
-      选项要 2×2 摆成方块，权重会让它们跟着屏幕宽度变，电视上反而不整齐。
-    -->
-    <style name="QuizOption">
-        <item name="android:layout_width">168dp</item>
-        <item name="android:layout_height">54dp</item>
-        <item name="android:layout_margin">5dp</item>
-        <item name="android:background">?attr/kioskKey</item>
-        <item name="android:clickable">true</item>
-        <item name="android:focusable">true</item>
-        <item name="android:gravity">center</item>
-        <item name="android:textColor">?attr/kioskText</item>
-        <item name="android:textSize">26sp</item>
-        <item name="android:textStyle">bold</item>
-    </style>
-
 </resources>

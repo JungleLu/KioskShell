@@ -58,20 +58,6 @@
                 android:layout_marginBottom="10dp" />
 
             <include
-                android:id="@+id/rowQuiz"
-                layout="@layout/item_time_row"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="10dp" />
-
-            <include
-                android:id="@+id/rowGrade"
-                layout="@layout/item_time_row"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="10dp" />
-
-            <include
                 android:id="@+id/rowGate"
                 layout="@layout/item_time_row"
                 android:layout_width="match_parent"
